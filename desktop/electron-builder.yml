@@ -1,18 +1,29 @@
 appId: com.factorycommit.desktop
 productName: Factory Commit
+# The server address is baked in at build time: set VITE_API_BASE_URL (and VITE_USE_MOCKS=false)
+# before `npm run dist`, e.g. VITE_API_BASE_URL=http://factory-server:8000
 directories:
   output: release
+  buildResources: build # build/icon.png (1024x1024 placeholder) becomes the app icon on every platform
 files:
   - dist/**
   - dist-electron/**
   - package.json
+artifactName: "${productName}-${version}-${os}-${arch}.${ext}"
 win:
   target: nsis
+  icon: build/icon.png
 mac:
   target: dmg
   category: public.app-category.business
+  icon: build/icon.png
 linux:
   target: AppImage
+  icon: build/icon.png
+  category: Office
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Factory Commit

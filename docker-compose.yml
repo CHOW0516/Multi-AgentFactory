@@ -105,6 +105,25 @@ services:
     command: ["python", "-m", "app.simulator", "run"]
     restart: "no"
 
+  backup:
+    image: postgres:16-alpine          # same pg_dump version as the database; busybox crond for BACKUP_CRON
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-factory}
+      PGUSER: ${POSTGRES_USER:-factory}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      BACKUP_PATH: /backups
+      BACKUP_CRON: ${BACKUP_CRON:-0 * * * *}
+      BACKUP_KEEP: ${BACKUP_KEEP:-72}
+    volumes:
+      - ./backups:/backups               # dumps land in ./backups on the host
+      - ./scripts/backup.sh:/scripts/backup.sh:ro
+    entrypoint: ["/scripts/backup.sh"]
+    command: ["schedule"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   documents:
