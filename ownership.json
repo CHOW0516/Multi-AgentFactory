@@ -1,0 +1,53 @@
+{
+  "_rules": "A path belongs to an owner when it starts with one of the owner's entries (entries ending in '/' are folders) and does not start with any entry in that owner's 'except'. Files at the repo root (no '/') belong to p1.",
+  "p1": {
+    "paths": [
+      ".github/", "scripts/", "e2e/",
+      "docs/CONTRACT.md", "docs/MASTER_PROMPT.md", "docs/RUNBOOK.md", "docs/foundation.md",
+      "docs/plans/p1.md", "docs/requests/p1.md",
+      "backend/pyproject.toml", "backend/requirements.txt", "backend/Dockerfile", "backend/.dockerignore",
+      "backend/alembic.ini", "backend/migrations/",
+      "backend/app/__init__.py", "backend/app/main.py", "backend/app/core/", "backend/app/models/",
+      "backend/app/schemas/", "backend/app/messaging/", "backend/app/llm/", "backend/app/simulator/",
+      "backend/app/agents/__init__.py", "backend/app/api/__init__.py", "backend/app/api/auth.py",
+      "backend/app/api/master_data.py", "backend/app/api/settings.py",
+      "backend/tests/__init__.py", "backend/tests/conftest.py", "backend/tests/foundation/",
+      "desktop/package.json", "desktop/package-lock.json", "desktop/tsconfig.json", "desktop/tsconfig.electron.json",
+      "desktop/vite.config.ts", "desktop/electron-builder.yml", "desktop/index.html", "desktop/.gitignore",
+      "desktop/electron/", "desktop/src/main.tsx", "desktop/src/App.tsx", "desktop/src/shell/", "desktop/src/api/",
+      "desktop/src/iso/", "desktop/src/theme/", "desktop/tests/setup.ts", "desktop/tests/shell/"
+    ]
+  },
+  "p2": {
+    "paths": [
+      "backend/app/agents/order/", "backend/app/agents/material/", "backend/app/agents/planning/",
+      "backend/app/api/orders.py", "backend/app/api/materials.py", "backend/app/api/quotations.py",
+      "backend/app/api/planning.py", "backend/tests/domain/",
+      "docs/domain-agents.md", "docs/plans/p2.md", "docs/requests/p2.md"
+    ]
+  },
+  "p3": {
+    "paths": [
+      "backend/app/orchestrator/", "backend/app/agents/quality/", "backend/app/agents/monitoring/",
+      "backend/app/agents/maintenance/", "backend/app/api/approvals.py", "backend/app/api/chat.py",
+      "backend/app/api/ws.py", "backend/app/api/agents.py", "backend/app/api/dashboard.py",
+      "backend/app/api/history.py", "backend/app/api/quality.py", "backend/app/api/machine_ops.py",
+      "backend/tests/orchestrator/",
+      "docs/orchestrator.md", "docs/plans/p3.md", "docs/requests/p3.md"
+    ]
+  },
+  "p4": {
+    "paths": [
+      "desktop/src/pages/", "desktop/src/global/", "desktop/src/components/", "desktop/tests/pages/",
+      "docs/desktop-pages.md", "docs/plans/p4.md", "docs/requests/p4.md"
+    ],
+    "except": ["desktop/src/pages/factory-floor/", "desktop/src/pages/agent-map/"]
+  },
+  "p5": {
+    "paths": [
+      "desktop/src/pages/factory-floor/", "desktop/src/pages/agent-map/", "desktop/src/figures/",
+      "desktop/tests/figures/",
+      "docs/iso-figures.md", "docs/plans/p5.md", "docs/requests/p5.md"
+    ]
+  }
+}

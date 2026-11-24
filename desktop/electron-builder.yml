@@ -1,0 +1,18 @@
+appId: com.factorycommit.desktop
+productName: Factory Commit
+directories:
+  output: release
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+win:
+  target: nsis
+mac:
+  target: dmg
+  category: public.app-category.business
+linux:
+  target: AppImage
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

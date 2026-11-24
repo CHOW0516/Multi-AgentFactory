@@ -1,4 +1,7 @@
-# SHARED CONTRACT (identical in all 5 prompts; do not change it on your own)
+# SHARED CONTRACT
+
+> This file in the repo is the source of truth. If it differs from the copy in your prompt, **this file wins**.
+> Changes after the original prompts are listed at the end under "Foundation updates".
 
 ## A. The team and the branches
 
@@ -160,3 +163,20 @@ Response shapes: P1 writes them as TypeScript types in `desktop/src/api/types.ts
 4. Write tests for your area. Mock other people's parts using the contract shapes.
 5. Commit often to your branch. Push with `git push -u origin <your-branch>`.
 6. When done: run your tests, run `scripts/check-ownership.sh <your-id>`, update your `docs/<area>.md`, list edge cases and tests in it, and tell P1 your branch is ready.
+
+
+---
+
+## Foundation updates (made by P1 while building the foundation)
+
+1. **Ownership source of truth is `ownership.json`.** P1 also owns `.github/`, `backend/.dockerignore`, `backend/tests/__init__.py`, `desktop/.gitignore`, `desktop/tsconfig.electron.json` and `desktop/tests/shell/`. Check any path with `python3 scripts/ownership.py owner <path>`.
+2. **`route.tsx` has two optional fields:** `showInSidebar?: boolean` (default `true`; use `false` for detail pages such as `/orders/:orderId`) and `public?: boolean` (only the `/login` route sets `public: true`). Icons are names from `desktop/src/shell/icons.tsx` (`factory`, `approvals`, `orders`, `schedule`, `materials`, `quotations`, `dashboards`, `agents`, `quality`, `history`, `settings`, ...). The app uses a hash router.
+3. **Extra table `llm_calls`** (purpose, model, order_id, tokens_in, tokens_out, cost_usd, stop_reason). `app.llm.call_claude` writes it; P3's dashboards read it for LLM cost.
+4. **Extra columns** you can use: `orders.order_number` (e.g. `SO-2026-0412`, unique), `orders.priority` (1 = highest, default 5), `orders.previous_order_id`, `orders.completed_at`, `order_lines.part_number_text` / `revision_text` (as written on the PO), `extracted_fields.needs_check` / `check_reason`, `schedule_slots.plan_option_id` / `quantity` / `is_overtime`, `plan_options.split_quantity_first` / `split_finish_date_first` / `machine_load` / `status`, `approvals.status` (`waiting|decided|cancelled`) / `what_changed` / `reminded_at` / `escalated_at`, `materials.unit_cost`, `parts.qc_sample_every` / `qc_notes`, `quotations.quote_number`, `machine_events.happened_at` / `order_id`, `workflow_runs.pending_message_id`, `agent_messages.in_reply_to` / `attempt`. Column names that differ from section F: `stock_movements.movement_type`, `stock_holds.hold_type`, `maintenance_events.maintenance_type`, `machines.floor_x/floor_y`, `holidays.holiday_date`.
+5. **Envelope** has `in_reply_to` (a result's task `message_id`). `publish_result` sets it.
+6. **`event.machine.unavailable`** uses the wire field `"from"`; in Python it is `MachineUnavailable.from_`. `app.messaging` already dumps with `by_alias=True`.
+7. **Files opened in an iframe** (e.g. the PO PDF) can pass the JWT as `?token=...`; `current_user` accepts it. Desktop: `fileUrl("/orders/<id>/document")` from `src/api/client.ts`.
+8. **Mock-mode live events:** `emitMockEvent(event)` from `src/api/client.ts` feeds `useLiveEvents` when `VITE_USE_MOCKS=true` (used by P5's mock generator).
+9. **Business thresholds** can be changed by admin at runtime. Read them with `app.api.settings.effective_settings(session)` instead of `settings.<name>` when the value is a business rule.
+10. **Claude calls:** forced `tool_choice` is not supported on the current models. For structured output use `call_claude(..., response_schema=...)` (returns `.data`). `extraction` calls keep working after the daily cost limit; `orchestrator` and `explain` calls raise `DailyCostLimitReached`.
+11. **Dev email server:** GreenMail, SMTP 3025, IMAP 3143, login `orders@factory.local` / `IMAP_PASSWORD`.

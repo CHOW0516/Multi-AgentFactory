@@ -1,0 +1,16 @@
+.env
+*.env.local
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+node_modules/
+desktop/dist/
+desktop/dist-electron/
+desktop/release/
+e2e/test-results/
+e2e/playwright-report/
+data/
+backups/
+.DS_Store
