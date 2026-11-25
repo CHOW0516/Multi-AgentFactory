@@ -140,3 +140,18 @@ button.gantt-bar { cursor: pointer; }
 .message-preview { white-space: pre-wrap; font-family: inherit; background: var(--color-surface-muted); border-radius: var(--radius-small); padding: var(--space-4); margin: 0; font-size: 14px; }
 .split-view { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
 @media (max-width: 1100px) { .split-view { grid-template-columns: 1fr; } }
+
+/* approval pack */
+.option-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-3); }
+.option-card { position: relative; border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-4); background: var(--color-surface); cursor: pointer; display: flex; flex-direction: column; gap: var(--space-2); }
+.option-card input { position: absolute; opacity: 0; }
+.option-card.selected { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent); }
+.option-card h3 { margin: 0; font-size: 15px; }
+.option-card dl { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--space-3); margin: 0; font-size: 13px; }
+.option-card dt { color: var(--color-text-muted); }
+.option-card dd { margin: 0; }
+.option-card .explanation { font-size: 13px; color: var(--color-text-muted); margin: 0; }
+.tag-recommended { align-self: flex-start; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-accent); }
+.decision-bar { position: sticky; bottom: 0; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); display: flex; gap: var(--space-2); justify-content: flex-end; align-items: center; box-shadow: var(--shadow-card); }
+.decision-bar .spacer { flex: 1; }
+.mismatch { color: var(--color-danger); font-weight: 500; }

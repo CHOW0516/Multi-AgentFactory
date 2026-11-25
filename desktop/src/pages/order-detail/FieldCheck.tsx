@@ -4,6 +4,11 @@ import type { ExtractedFieldOut, FieldCorrection } from "../../api/types";
 import { formatNumber, nameLabel } from "../../components/format";
 
 const LOW_CONFIDENCE = 0.85;
+const FIELD_LABELS: Record<string, string> = {
+  po_number: "PO number", part_number: "Part number", unit_price: "Unit price", due_date: "Due date",
+  delivery_address: "Delivery address", po_revision: "PO revision",
+};
+const fieldLabel = (fieldName: string) => FIELD_LABELS[fieldName] ?? nameLabel(fieldName);
 
 export function FieldCheck({ fields, editable, saving, onConfirm, userName }: {
   fields: ExtractedFieldOut[];
@@ -36,12 +41,12 @@ export function FieldCheck({ fields, editable, saving, onConfirm, userName }: {
             return (
               <tr key={field.id} className={field.needs_check ? "flagged" : undefined}>
                 <td>
-                  {nameLabel(field.field_name)}
+                  {fieldLabel(field.field_name)}
                   {field.check_reason ? <div className="corrected-note">{field.check_reason}</div> : null}
                 </td>
                 <td>
                   {editable && field.needs_check ? (
-                    <input aria-label={nameLabel(field.field_name)} value={edits[field.id] ?? shownValue}
+                    <input aria-label={fieldLabel(field.field_name)} value={edits[field.id] ?? shownValue}
                       onChange={(event) => setEdits({ ...edits, [field.id]: event.target.value })} />
                   ) : (
                     <span data-field={field.field_name}>{shownValue || "—"}</span>
