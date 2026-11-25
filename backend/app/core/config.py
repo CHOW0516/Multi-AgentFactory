@@ -41,7 +41,10 @@ class Settings(BaseSettings):
     ai_model_quality: str = ""
     ai_model_maintenance: str = ""
     ai_model_monitoring: str = ""
-    ai_prices: str = "{}"  # JSON: {"model": [usd per million input tokens, usd per million output tokens]}
+    # JSON: {"model": [usd per million input, output, cached input tokens]}; cached is optional.
+    ai_prices: str = (
+        '{"grafilab/glm-5.3-flash": [0.08, 0.26, 0.02], "gemini/gemini-3.8-flash": [0.49, 2.45, 0.49]}'
+    )
     llm_max_tokens: int = 4096
     llm_daily_cost_limit_usd: float = 20.0
 

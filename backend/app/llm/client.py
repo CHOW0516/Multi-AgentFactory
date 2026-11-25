@@ -217,8 +217,9 @@ async def record_call(
     tokens_in: int,
     tokens_out: int,
     stop_reason: str | None,
+    cached_tokens_in: int = 0,
 ) -> Decimal:
-    call_cost = cost_usd(model, tokens_in, tokens_out)
+    call_cost = cost_usd(model, tokens_in, tokens_out, cached_tokens_in)
     async with session_scope() as session:
         session.add(
             LlmCall(
@@ -264,7 +265,10 @@ async def call_ai(
     reply = from_provider_reply(await post_chat_completion(request))
     tokens_in = int(reply.usage.get("prompt_tokens") or 0)
     tokens_out = int(reply.usage.get("completion_tokens") or 0)
-    call_cost = await record_call(purpose, model, order_id, tokens_in, tokens_out, reply.stop_reason)
+    cached_tokens_in = int((reply.usage.get("prompt_tokens_details") or {}).get("cached_tokens") or 0)
+    call_cost = await record_call(
+        purpose, model, order_id, tokens_in, tokens_out, reply.stop_reason, cached_tokens_in
+    )
 
     if reply.stop_reason == "content_filter":
         raise LlmRefused(f"The AI declined the {purpose} request")

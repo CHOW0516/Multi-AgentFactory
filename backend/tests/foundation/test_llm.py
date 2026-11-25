@@ -25,7 +25,7 @@ def ai_settings(monkeypatch):
     monkeypatch.setattr(settings, "ai_model_orchestrator", "gemini/gemini-3.8-flash")
     monkeypatch.setattr(settings, "ai_model_order", "gemini/gemini-3.8-flash")
     monkeypatch.setattr(settings, "ai_model_planning", "")
-    monkeypatch.setattr(settings, "ai_prices", json.dumps({"gemini/gemini-3.8-flash": [1, 4]}))
+    monkeypatch.setattr(settings, "ai_prices", json.dumps({"gemini/gemini-3.8-flash": [1, 4, 0.5]}))
     pricing.prices.cache_clear()
     yield settings
     pricing.prices.cache_clear()
@@ -41,6 +41,24 @@ def test_each_agent_gets_its_own_model_or_the_default(ai_settings):
 def test_cost_uses_prices_from_env_and_zero_for_unknown_models(ai_settings):
     assert pricing.cost_usd("gemini/gemini-3.8-flash", 1_000_000, 1_000_000) == Decimal("5")
     assert pricing.cost_usd("not-priced", 1_000_000, 1_000_000) == Decimal("0")
+    # 400k of the 1M input tokens were cached: 0.6 * 1 + 0.4 * 0.5 = 0.8 for input.
+    assert pricing.cost_usd("gemini/gemini-3.8-flash", 1_000_000, 0, cached_tokens_in=400_000) == Decimal(
+        "0.8"
+    )
+
+
+def test_default_prices_are_grafilabs(monkeypatch):
+    from app.core.config import Settings
+
+    pricing.prices.cache_clear()
+    monkeypatch.setattr(
+        pricing, "settings", Settings(database_url="x", rabbitmq_url="x", jwt_secret="x" * 40)
+    )
+    try:
+        assert pricing.cost_usd("grafilab/glm-5.3-flash", 1_000_000, 1_000_000, 1_000_000) == Decimal("0.28")
+        assert pricing.cost_usd("gemini/gemini-3.8-flash", 1_000_000, 1_000_000) == Decimal("2.94")
+    finally:
+        pricing.prices.cache_clear()
 
 
 def test_bad_prices_json_counts_as_zero(ai_settings, monkeypatch):
