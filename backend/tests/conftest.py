@@ -29,7 +29,7 @@ os.environ.setdefault("ADMIN_EMAIL", "admin@factory.local")
 os.environ.setdefault("ADMIN_INITIAL_PASSWORD", "test-password")
 os.environ.setdefault("RABBITMQ_URL", "amqp://factory:factory@localhost:5672/")
 os.environ.setdefault("APP_MODE", "demo")
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
+os.environ.setdefault("AI_API_KEY", "test-key")
 
 import asyncpg  # noqa: E402
 import httpx  # noqa: E402
