@@ -13,6 +13,8 @@ const startOfToday = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00
 export const isoDay = (offsetDays: number) => new Date(startOfToday + offsetDays * DAY).toISOString().slice(0, 10);
 export const isoTime = (offsetHours: number) => new Date(startOfToday + 8 * 3_600_000 + offsetHours * 3_600_000).toISOString();
 const id = (prefix: string, number: number) => `${prefix}-0000-4000-8000-${String(number).padStart(12, "0")}`;
+/** An id for something that belongs to one parent (e.g. a slot of an order): keeps the parent's unique digits. */
+const childId = (parentId: string, tag: string) => `${tag.padEnd(8, "0").slice(0, 8)}${parentId.slice(8)}`;
 
 export const users: UserOut[] = [
   { id: id("u0000001", 1), name: "Admin", email: "admin@factory.local", role: "admin", backup_approver_id: null, is_active: true },
@@ -123,7 +125,7 @@ for (const order of orders) {
     ["delivery_address", order.delivery_address, 0.9, false, null],
   ];
   fieldsByOrder[order.id] = rows.map(([fieldName, value, confidence, needsCheck, reason], index) => ({
-    id: `${order.id.slice(0, 24)}${String(index + 1).padStart(12, "0")}`, field_name: fieldName, value,
+    id: childId(order.id, `f${index + 1}`), field_name: fieldName, value,
     confidence: confidence.toFixed(2), source_page: 1, source_text: value, needs_check: needsCheck, check_reason: reason,
     corrected_value: null, corrected_by: null,
   }));
@@ -151,13 +153,13 @@ export function planOptionsFor(order: OrderDetail): PlanOptionOut[] {
   const impacted = [{ order_id: orders[11].id, order_number: orders[11].order_number, old_finish: isoDay(9), new_finish: isoDay(10), still_meets_due_date: true }];
   const base = { split_quantity_first: null, split_finish_date_first: null, machine_load: { "CNC-01": 0.82, "LTH-01": 0.64 }, status: "proposed" };
   return [
-    { ...base, id: `${order.id.slice(0, 30)}aaaaaa`, option_type: "as_requested", finish_date: due, overtime_hours: "0", extra_cost: "0",
+    { ...base, id: childId(order.id, "pa"), option_type: "as_requested", finish_date: due, overtime_hours: "0", extra_cost: "0",
       margin: "0.24", impacted_orders: [], explanation: "Fits the requested date with today's load; no other order moves.", is_recommended: !order.id.endsWith("7") },
-    { ...base, id: `${order.id.slice(0, 30)}bbbbbb`, option_type: "overtime", finish_date: due, overtime_hours: "6", extra_cost: "540.00",
+    { ...base, id: childId(order.id, "pb"), option_type: "overtime", finish_date: due, overtime_hours: "6", extra_cost: "540.00",
       margin: "0.21", impacted_orders: [], explanation: "6 hours of Saturday overtime on CNC-01 keeps the date if the stainless sheet arrives late.", is_recommended: false },
-    { ...base, id: `${order.id.slice(0, 30)}cccccc`, option_type: "delay", finish_date: isoDay(21), overtime_hours: "0", extra_cost: "0",
+    { ...base, id: childId(order.id, "pc"), option_type: "delay", finish_date: isoDay(21), overtime_hours: "0", extra_cost: "0",
       margin: "0.24", impacted_orders: [], explanation: "Finishing 6 days later needs no overtime and waits for the material delivery.", is_recommended: order.id.endsWith("7") },
-    { ...base, id: `${order.id.slice(0, 30)}dddddd`, option_type: "move_other_order", finish_date: due, overtime_hours: "0", extra_cost: "0",
+    { ...base, id: childId(order.id, "pd"), option_type: "move_other_order", finish_date: due, overtime_hours: "0", extra_cost: "0",
       margin: "0.24", impacted_orders: impacted, explanation: `Moves ${impacted[0].order_number} by one day; it still meets its own due date.`, is_recommended: false },
   ];
 }
@@ -167,7 +169,7 @@ export function customerMessageFor(order: OrderDetail, kind: "confirm" | "counte
   const existing = customerMessages[order.id];
   if (existing && kind === "confirm") return existing;
   const message: CustomerMessageOut = {
-    id: `${order.id.slice(0, 30)}eeeeee`, order_id: order.id, plan_option_id: null,
+    id: childId(order.id, "cm"), order_id: order.id, plan_option_id: null,
     subject: `Re: Purchase order ${order.po_number}`,
     draft_text: kind === "confirm"
       ? `Dear ${order.customer_name},\n\nThank you for PO ${order.po_number}. We confirm ${order.lines[0].quantity} pcs of ${order.lines[0].part_number_text} rev ${order.lines[0].revision_text}, delivery on ${order.due_date}.\n\nBest regards,\nMei, Sales`
@@ -186,9 +188,9 @@ export const scheduleSlots: ScheduleSlotOut[] = orders
     const startHours = -24 + index * 20;
     const status: ScheduleSlotOut["status"] = order.status === "COMPLETED" ? "done" : ["PLANNED", "WAITING_APPROVAL"].includes(order.status) ? "tentative" : "locked";
     return [
-      { id: `${order.id.slice(0, 30)}111111`, order_id: order.id, order_number: order.order_number, machine_id: machine.id, routing_step: 1,
+      { id: childId(order.id, "s1"), order_id: order.id, order_number: order.order_number, machine_id: machine.id, routing_step: 1,
         quantity: order.lines[0].quantity, start_at: isoTime(startHours), end_at: isoTime(startHours + 16), status, is_overtime: false },
-      { id: `${order.id.slice(0, 30)}222222`, order_id: order.id, order_number: order.order_number, machine_id: nextMachine.id, routing_step: 2,
+      { id: childId(order.id, "s2"), order_id: order.id, order_number: order.order_number, machine_id: nextMachine.id, routing_step: 2,
         quantity: order.lines[0].quantity, start_at: isoTime(startHours + 18), end_at: isoTime(startHours + 28), status, is_overtime: index % 4 === 1 },
     ];
   });
@@ -275,7 +277,7 @@ export const purchaseRequests: PurchaseRequestOut[] = [
 
 export const qcPlans: Record<string, QcPlanOut> = {};
 for (const order of orders.filter((candidate) => ["IN_PRODUCTION", "COMPLETED", "CONFIRMED"].includes(candidate.status))) {
-  qcPlans[order.id] = { id: `${order.id.slice(0, 30)}999999`, order_id: order.id, checks: [
+  qcPlans[order.id] = { id: childId(order.id, "qc"), order_id: order.id, checks: [
     { name: "First piece dimensions", kind: "first_piece", every_n: null, spec: "All drawing dims ±0.05" },
     { name: "Sample hole position", kind: "sample", every_n: 50, spec: "Ø6.0 +0.02/-0 at 25.00 ±0.03" },
     { name: "Final visual and count", kind: "final", every_n: null, spec: "No burrs, correct quantity" },

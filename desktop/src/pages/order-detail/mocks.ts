@@ -37,7 +37,7 @@ registerMock("GET", "/orders/:orderId/customer-message", ({ params }) => {
   const order = orderOr404(params.orderId);
   if (!customerMessages[order.id] && ["REPLY_DRAFTED", "CUSTOMER_REPLIED", "IN_PRODUCTION", "COMPLETED"].includes(order.status)) {
     customerMessages[order.id] = {
-      id: `${order.id.slice(0, 30)}eeeeee`, order_id: order.id, plan_option_id: null, subject: `Re: Purchase order ${order.po_number}`,
+      id: `cm000000${order.id.slice(8)}`, order_id: order.id, plan_option_id: null, subject: `Re: Purchase order ${order.po_number}`,
       draft_text: `Dear ${order.customer_name},\n\nWe confirm PO ${order.po_number} for delivery on ${order.due_date}.\n\nBest regards,\nMei, Sales`,
       status: order.status === "REPLY_DRAFTED" ? "draft" : "sent_by_sales", sent_at: order.status === "REPLY_DRAFTED" ? null : order.created_at,
     };
