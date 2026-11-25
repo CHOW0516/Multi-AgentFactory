@@ -36,4 +36,4 @@ Run from `backend` with `TEST_DATABASE_URL` pointing at a dedicated PostgreSQL t
 python -m pytest tests/domain tests/foundation
 ```
 
-Domain coverage includes ten synthetic PO files, quotation and revision checks, sales corrections, duplicate IMAP intake, broker recovery, reservation concurrency and expiry, due-date feasibility, split and overtime arithmetic, moving locked work, holidays and maintenance, time limits, stale plans, machine replans, read-only what-if calls, and API roles. Set `RUN_LIVE_LLM_TESTS=1` and provide `ANTHROPIC_API_KEY` to opt in to the live extraction test.
+Domain coverage includes ten synthetic PO files, quotation and revision checks, sales corrections, duplicate IMAP intake, broker recovery, reservation concurrency and expiry, due-date feasibility, split and overtime arithmetic, moving locked work, holidays and maintenance, time limits, stale plans, machine replans, read-only what-if calls, and API roles. Set `RUN_LIVE_LLM_TESTS=1` and provide `AI_API_KEY` to opt in to the live extraction test.

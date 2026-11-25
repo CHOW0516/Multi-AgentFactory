@@ -35,3 +35,16 @@ async def test_seed_refuses_when_data_exists(users):
 
     with pytest.raises(RuntimeError):
         await seed()
+
+
+async def test_demo_reset_endpoint_is_admin_only_and_reseeds(client, auth_headers, monkeypatch):
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    assert (await client.post("/api/demo/reset", headers=auth_headers("manager"))).status_code == 403
+    monkeypatch.setattr(settings, "app_mode", "production")
+    assert (await client.post("/api/demo/reset", headers=auth_headers("admin"))).status_code == 403
+    monkeypatch.undo()
+    reset = await client.post("/api/demo/reset", headers=auth_headers("admin"))
+    assert reset.status_code == 200, reset.text
+    assert reset.json()["machines"] == 8

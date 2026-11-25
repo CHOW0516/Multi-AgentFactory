@@ -55,7 +55,7 @@ class ProcessedMessage(TableBase):
 
 
 class LlmCall(TableBase):
-    """One row per Claude call, for cost tracking and the daily limit."""
+    """One row per AI call, for cost tracking and the daily limit."""
 
     __tablename__ = "llm_calls"
 

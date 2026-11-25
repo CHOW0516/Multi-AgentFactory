@@ -21,7 +21,7 @@ from app.agents.order.intake import document_path
 from app.api.settings import effective_settings
 from app.core.audit import write_audit
 from app.core.db import session_scope
-from app.llm.client import call_claude, document_block, image_block
+from app.llm.client import call_ai, document_block, image_block
 from app.models import AuditLog, Customer, ExtractedField, Order, OrderLine, Part, Quotation, SourceDocument
 from app.schemas.contracts import ExtractDocumentResult, QuotationMismatch
 
@@ -382,10 +382,12 @@ async def extract_document(document_id: UUID) -> ExtractDocumentResult:
             result = ExtractDocumentResult.model_validate(previous.after["result"])
         else:
             blocks = await asyncio.to_thread(input_blocks, document)
-            response = await call_claude(
+            response = await call_ai(
+                "order",
                 "extraction",
                 [{"role": "user", "content": blocks}],
-                system=SYSTEM_PROMPT,
+                system=SYSTEM_PROMPT
+                + "\nReply with one JSON object that matches the given schema and nothing else.",
                 response_schema=PurchaseOrder.model_json_schema(),
                 order_id=order.id,
             )

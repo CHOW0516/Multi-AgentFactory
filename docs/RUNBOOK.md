@@ -6,7 +6,7 @@ All commands run from the repository root on the server machine.
 ## 1. First start
 
 ```bash
-cp .env.example .env          # then fill in every "change-me" value and ANTHROPIC_API_KEY
+cp .env.example .env          # then fill in every "change-me" value and AI_API_KEY (Grafilab)
 docker compose up -d postgres rabbitmq greenmail
 docker compose run --rm migrate
 docker compose run --rm seed  # demo data + the admin user from ADMIN_EMAIL / ADMIN_INITIAL_PASSWORD
@@ -145,3 +145,11 @@ When the system is back, enter the paper slips **oldest first**, before starting
 | "Daily AI cost limit reached" | Raise `LLM_DAILY_COST_LIMIT_USD` in Settings, or wait until tomorrow; PO extraction still works |
 | Database full or slow | `docker system df`; prune old backups; check `BACKUP_KEEP` |
 | Forgot a password | An admin resets it in Settings → Users. If no admin can sign in, contact the developer; do not edit the database by hand |
+
+## AI provider and models
+
+The AI runs on Grafilab through its OpenAI-compatible API (`AI_BASE_URL`, `AI_API_KEY` in `.env`).
+`AI_MODEL` is the default model for every agent. Set `AI_MODEL_<AGENT>` (`ORCHESTRATOR`, `ORDER`, `PLANNING`,
+`MATERIAL`, `QUALITY`, `MAINTENANCE`, `MONITORING`) to give one agent its own model; empty means `AI_MODEL`.
+To change a model, edit `.env` and run `docker compose up -d` (no rebuild). Put each model's price in
+`AI_PRICES` so the cost log and the daily limit are right; a model without a price counts as 0.

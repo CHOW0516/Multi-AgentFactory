@@ -20,7 +20,7 @@ def at(day, hour):
 
 
 @pytest.fixture
-async def capacity(db_session, catalog, planning_clock, fake_claude):
+async def capacity(db_session, catalog, planning_clock, fake_ai):
     async def setup(cycle_seconds=3600):
         machine = Machine(code="MILL-01", name="Mill 1", machine_type="milling")
         db_session.add_all(
@@ -41,7 +41,7 @@ async def capacity(db_session, catalog, planning_clock, fake_claude):
         )
         await db_session.commit()
         for _ in range(15):
-            fake_claude.add_response(text="This option fits the available production capacity.")
+            fake_ai.add_response(text="This option fits the available production capacity.")
         return machine
 
     return setup
@@ -305,3 +305,10 @@ async def test_schedule_includes_overlap_and_maintenance(
     )
     assert result.status_code == 200, result.text
     assert len(result.json()["slots"]) == len(result.json()["maintenance"]) == 1
+
+
+async def test_unknown_material_date_gives_no_promised_option(capacity, make_order, db_session):
+    await capacity(cycle_seconds=1800)
+    order = await make_order(quantity=10, due_date=MONDAY)
+    result = await service.plan_order(db_session, order.id, None)
+    assert result.recommended_option_id is None

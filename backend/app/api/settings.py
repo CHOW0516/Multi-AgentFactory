@@ -58,3 +58,18 @@ async def update_settings(
     return SettingsOut(
         app_mode=settings.app_mode, currency=settings.currency, timezone=settings.app_timezone, values=after
     )
+
+
+@router.post("/demo/reset")
+async def reset_demo_data(
+    session: AsyncSession = Depends(get_session), user: User = Depends(require_roles())
+) -> dict[str, int]:
+    """Wipes every table and loads the demo data again, like `python -m app.simulator reset`. Admin only, demo mode only.
+    Everyone, including the caller, must log in again afterwards because the users are created again."""
+    from app.simulator.seed import seed  # imported here so the API does not load the simulator at startup
+
+    if not settings.is_demo:
+        raise HTTPException(403, "Demo reset is only available when APP_MODE=demo")
+    # End this request's read transaction so TRUNCATE is not blocked by our own lock on the users table.
+    await session.rollback()
+    return await seed(reset=True)

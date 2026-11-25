@@ -14,3 +14,6 @@ e2e/playwright-report/
 data/
 backups/
 .DS_Store
+
+# test PO files made by: python -m app.simulator test-pos
+test-pos/

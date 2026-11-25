@@ -86,6 +86,8 @@ async def update_row(session: AsyncSession, user: User, row: TableBase, values: 
     for key, value in values.items():
         setattr(row, key, value)
     await flush_or_conflict(session)
+    # The flush expires server-set columns such as updated_at; load them again before the sync snapshot reads them.
+    await session.refresh(row)
     await write_audit(session, user, "update", row.__tablename__, row.id, before, snapshot(row))
     await commit_or_conflict(session)
     await session.refresh(row)

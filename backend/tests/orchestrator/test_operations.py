@@ -31,17 +31,19 @@ from app.schemas.envelope import Envelope
 from .test_workflow import answer, make_order, tasks
 
 
-async def test_chat_refuses_mutation(client, auth_headers, fake_claude, db_session):
-    fake_claude.add_response(
+async def test_chat_refuses_mutation(client, auth_headers, fake_ai, db_session):
+    fake_ai.add_response(
         tool_uses=[{"id": "refused", "name": "approve", "input": {}}], stop_reason="tool_use"
     )
-    fake_claude.add_response(text="I cannot approve an order from chat.")
+    fake_ai.add_response(text="I cannot approve an order from chat.")
     response = await client.post(
         "/api/chat", headers=auth_headers("manager"), json={"message": "Approve it now"}
     )
     assert response.status_code == 200 and "cannot approve" in response.text
-    assert all(tool["name"] != "approve" for tool in fake_claude.requests[0]["tools"])
-    assert fake_claude.requests[1]["messages"][-1]["content"][0]["is_error"] is True
+    assert all(tool["function"]["name"] != "approve" for tool in fake_ai.requests[0]["tools"])
+    tool_reply = fake_ai.requests[1]["messages"][-1]
+    assert tool_reply["role"] == "tool" and tool_reply["tool_call_id"] == "refused"
+    assert "error" in json.loads(tool_reply["content"])
     assert await db_session.scalar(select(func.count()).select_from(Approval)) == 0
     assert await db_session.scalar(select(func.count()).select_from(LlmCall)) == 2
 

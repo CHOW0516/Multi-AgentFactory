@@ -51,21 +51,22 @@ def extraction(po="PO-100", *, customer="ACME", part="PX-14", quantity="10", pri
 
 
 @pytest.mark.parametrize("fixture", FILES, ids=lambda path: path.name)
-async def test_extract_fixture(fixture, catalog, fake_claude, fake_broker, db_session):
-    fake_claude.add_response(text=json.dumps(extraction(customer=" acme ", part=" pX-14 ")))
+async def test_extract_fixture(fixture, catalog, fake_ai, fake_broker, db_session):
+    fake_ai.add_response(text=json.dumps(extraction(customer=" acme ", part=" pX-14 ")))
     (order,) = await store_documents([Attachment(fixture.name, fixture.read_bytes())])
     result = await extract_document(order.source_document_id)
     repeat = await extract_document(order.source_document_id)
     assert repeat == result
     assert not result.fields_needing_check and not result.quotation_mismatches
-    assert len(fake_claude.requests) == 1
-    req = fake_claude.requests[0]
-    blocks = req["messages"][0]["content"]
-    expected_type = {".pdf": "document", ".png": "image"}.get(fixture.suffix, "text")
+    assert len(fake_ai.requests) == 1
+    req = fake_ai.requests[0]
+    assert req["messages"][0]["role"] == "system"
+    blocks = req["messages"][1]["content"]
+    expected_type = {".pdf": "image_url", ".png": "image_url"}.get(fixture.suffix, "text")
     assert blocks[0]["type"] == expected_type
     if expected_type == "text":
         assert "PX-14" in blocks[0]["text"]
-    assert req["output_config"]["format"]["schema"]["additionalProperties"] is False
+    assert req["response_format"]["json_schema"]["schema"]["additionalProperties"] is False
     saved = await db_session.get(Order, order.id)
     assert saved.customer_id == catalog.customer.id
     line = await db_session.scalar(select(OrderLine).where(OrderLine.order_id == order.id))
@@ -75,7 +76,7 @@ async def test_extract_fixture(fixture, catalog, fake_claude, fake_broker, db_se
     assert len(fake_broker.published_to("event.order.received")) == 1
 
 
-async def test_confidence_quotation_and_revised_po(catalog, make_order, fake_claude, fake_broker, db_session):
+async def test_confidence_quotation_and_revised_po(catalog, make_order, fake_ai, fake_broker, db_session):
     original = await make_order(status="CONFIRMED", po_number="PO-100", due_date=date(2027, 2, 12))
     db_session.add(
         Quotation(
@@ -89,7 +90,7 @@ async def test_confidence_quotation_and_revised_po(catalog, make_order, fake_cla
         )
     )
     await db_session.commit()
-    fake_claude.add_response(text=json.dumps(extraction(quantity="11", price="26.00", confidence=0.3)))
+    fake_ai.add_response(text=json.dumps(extraction(quantity="11", price="26.00", confidence=0.3)))
     (order,) = await store_documents([Attachment(FILES[0].name, FILES[0].read_bytes())])
     result = await extract_document(order.source_document_id)
     assert set(result.fields_needing_check) == {"due_date", "lines[0].quantity", "lines[0].unit_price"}
@@ -100,9 +101,9 @@ async def test_confidence_quotation_and_revised_po(catalog, make_order, fake_cla
 
 
 async def test_sales_can_correct_an_unmatched_part(
-    catalog, fake_claude, db_session, client, auth_headers, fake_broker
+    catalog, fake_ai, db_session, client, auth_headers, fake_broker
 ):
-    fake_claude.add_response(text=json.dumps(extraction(part="UNKNOWN")))
+    fake_ai.add_response(text=json.dumps(extraction(part="UNKNOWN")))
     (order,) = await store_documents([Attachment(FILES[0].name, FILES[0].read_bytes())])
     result = await extract_document(order.source_document_id)
     assert "lines[0].part_number" in result.fields_needing_check
@@ -189,7 +190,7 @@ async def test_email_retries_after_commit_without_a_second_order(
 
 
 async def test_split_draft_and_close_use_database_facts(
-    catalog, make_order, db_session, fake_claude, fake_broker
+    catalog, make_order, db_session, fake_ai, fake_broker
 ):
     order = await make_order(quantity=10, status="CONFIRMED", po_number="PO-101")
     proposal = PlanOption(
@@ -201,7 +202,7 @@ async def test_split_draft_and_close_use_database_facts(
     )
     db_session.add(proposal)
     await db_session.flush()
-    fake_claude.add_response(text="Thank you for your order.")
+    fake_ai.add_response(text="Thank you for your order.")
     drafted = await draft_customer_reply(db_session, order.id, proposal.id)
     saved = await db_session.get(CustomerMessage, drafted.customer_message_id)
     assert saved.status == "draft"
@@ -237,10 +238,10 @@ async def test_upload_recovers_a_pending_event(client, auth_headers, catalog, mo
     assert len(fake_broker.published_to("event.order.received")) == 1
 
 
-@pytest.mark.skipif(os.environ.get("RUN_LIVE_LLM_TESTS") != "1", reason="live Claude is opt-in")
-async def test_live_claude(catalog):
-    if not settings.anthropic_api_key or settings.anthropic_api_key == "test-key":
-        pytest.skip("ANTHROPIC_API_KEY is required")
+@pytest.mark.skipif(os.environ.get("RUN_LIVE_LLM_TESTS") != "1", reason="live AI provider is opt-in")
+async def test_live_ai_extraction(catalog):
+    if not settings.ai_api_key or settings.ai_api_key == "test-key":
+        pytest.skip("AI_API_KEY is required")
     (order,) = await store_documents([Attachment(FILES[0].name, FILES[0].read_bytes())])
     result = await extract_document(order.source_document_id)
     assert result.order_id == order.id

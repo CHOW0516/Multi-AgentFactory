@@ -129,16 +129,21 @@ async def test_failing_handler_retries_then_dead_letters_and_reports(monkeypatch
     assert count == 1
 
 
-async def test_handler_llm_usage_is_reported_on_result(fake_claude, fake_broker):
-    from app.llm import call_claude
+async def test_handler_llm_usage_is_reported_on_result(fake_ai, fake_broker, monkeypatch):
+    from app.core.config import get_settings
+    from app.llm import call_ai, model_for, pricing
 
-    fake_claude.add_response(text="ok", tokens_in=1000, tokens_out=200)
+    monkeypatch.setattr(get_settings(), "ai_prices", json.dumps({model_for("material"): [1, 1]}))
+    pricing.prices.cache_clear()
+
+    fake_ai.add_response(text="ok", tokens_in=1000, tokens_out=200)
 
     async def handler(envelope):
-        await call_claude("explain", messages=[{"role": "user", "content": "hi"}])
+        await call_ai("material", "explain", messages=[{"role": "user", "content": "hi"}])
         await publish_result(envelope, "ok", {"valid": True, "changes": []})
 
     envelope, delivery = task_delivery(action="recheck_holds")
     assert await make_delivery_handler("material", handler)(delivery)
     copy = json.loads(fake_broker.published_to(AGENT_MESSAGE_EVENT)[-1].body)
     assert copy["tokens_in"] == 1000 and copy["tokens_out"] == 200 and copy["cost_usd"] > 0
+    pricing.prices.cache_clear()

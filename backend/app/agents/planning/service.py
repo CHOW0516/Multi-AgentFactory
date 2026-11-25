@@ -8,7 +8,6 @@ from decimal import Decimal
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-import anthropic
 from sqlalchemy import delete, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +18,7 @@ from app.agents.planning.solver import Job
 from app.api.settings import effective_settings
 from app.core.audit import write_audit
 from app.core.config import settings
-from app.llm.client import DailyCostLimitReached, LlmRefused, call_claude
+from app.llm.client import DailyCostLimitReached, LlmRefused, LlmUnavailable, call_ai
 from app.models import (
     AuditLog,
     Holiday,
@@ -214,7 +213,8 @@ async def explain(
     }
     wording = ""
     try:
-        result = await call_claude(
+        result = await call_ai(
+            "planning",
             "explain",
             [{"role": "user", "content": str(facts)}],
             system=(
@@ -226,7 +226,7 @@ async def explain(
         line = result.text.strip()
         if line and len(line) <= 300 and "\n" not in line and not any(char.isdigit() for char in line):
             wording = " " + line
-    except (anthropic.APIError, DailyCostLimitReached, LlmRefused):
+    except (LlmUnavailable, DailyCostLimitReached, LlmRefused):
         logger.info("Using computed explanation for %s option on order %s", candidate.kind, order.id)
 
     explanation = ready + wording
@@ -253,7 +253,7 @@ async def clear_proposals(session: AsyncSession, order_id: UUID, option_id: UUID
 async def plan_order(
     session: AsyncSession,
     order_id: UUID,
-    material_ready_date: date,
+    material_ready_date: date | None,
     task_id: UUID | None = None,
     *,
     outage: ReplanForMachinePayload | None = None,
@@ -277,8 +277,9 @@ async def plan_order(
     if not lines or any(line.part_id is None or line.quantity <= 0 for line in lines):
         raise ValueError("Order requires verified lines with parts and positive quantities")
     items = [(line.part_id, line.quantity) for line in lines]
+    # The scheduler uses date.max for "material date unknown"; it then offers no promised option.
     scenario = await load_scenario(
-        session, items, material_ready_date, order.due_date, order=order, outage=outage
+        session, items, material_ready_date or date.max, order.due_date, order=order, outage=outage
     )
     candidates, reasons = await asyncio.to_thread(propose, scenario)
 

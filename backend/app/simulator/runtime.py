@@ -103,6 +103,8 @@ class MachineSimulation:
     last_status: dict[uuid.UUID, str] = field(default_factory=dict)
     last_count: dict[uuid.UUID, int] = field(default_factory=dict)
     broken_until: dict[uuid.UUID, datetime] = field(default_factory=dict)
+    # Slots that got at least one count: slot id -> (machine id, quantity, end time). Used for the final count.
+    counted_slots: dict[uuid.UUID, tuple[uuid.UUID, int, datetime]] = field(default_factory=dict)
 
     async def tick(self, now: datetime | None = None, interval_seconds: float | None = None) -> list[dict]:
         """One simulation step. Returns the events it published."""
@@ -124,7 +126,7 @@ class MachineSimulation:
             ).all()
         slot_by_machine = {slot.machine_id: slot for slot in active_slots}
 
-        published = []
+        published = await self._publish_final_counts({slot.id for slot in active_slots}, now)
         for machine in machines:
             if machine.id in self.broken_until:
                 if now < self.broken_until[machine.id]:
@@ -148,6 +150,22 @@ class MachineSimulation:
                 if count != self.last_count.get(slot.id):
                     published.append(await self._publish(machine.id, "count", str(count), now))
                     self.last_count[slot.id] = count
+                    self.counted_slots[slot.id] = (machine.id, int(slot.quantity), slot.end_at)
+        return published
+
+    async def _publish_final_counts(self, active_slot_ids: set[uuid.UUID], now: datetime) -> list[dict]:
+        """When a slot we were counting reaches its end, send its full quantity once.
+        Progress counts carry noise and are rounded down, so without this a finished slot never reaches its quantity.
+        A slot that stopped early (cancelled or moved) or whose machine is broken gets no final count."""
+        published = []
+        for slot_id, (machine_id, quantity, end_at) in list(self.counted_slots.items()):
+            if slot_id in active_slot_ids:
+                continue
+            del self.counted_slots[slot_id]
+            finished = now >= end_at and machine_id not in self.broken_until
+            if finished and self.last_count.get(slot_id) != quantity:
+                published.append(await self._publish(machine_id, "count", str(quantity), now))
+            self.last_count.pop(slot_id, None)
         return published
 
     def _expected_count(self, slot: ScheduleSlot, now: datetime) -> int:
