@@ -13,7 +13,7 @@
       "backend/app/api/master_data.py", "backend/app/api/settings.py",
       "backend/tests/__init__.py", "backend/tests/conftest.py", "backend/tests/foundation/",
       "desktop/package.json", "desktop/package-lock.json", "desktop/tsconfig.json", "desktop/tsconfig.electron.json",
-      "desktop/vite.config.ts", "desktop/electron-builder.yml", "desktop/index.html", "desktop/.gitignore",
+      "desktop/vite.config.ts", "desktop/electron-builder.yml", "desktop/build/", "desktop/index.html", "desktop/.gitignore",
       "desktop/electron/", "desktop/src/main.tsx", "desktop/src/App.tsx", "desktop/src/shell/", "desktop/src/api/",
       "desktop/src/iso/", "desktop/src/theme/", "desktop/tests/setup.ts", "desktop/tests/shell/"
     ]

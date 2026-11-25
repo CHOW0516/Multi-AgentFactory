@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test --config ../e2e/playwright.config.ts --trace off",
+    "e2e": "node ../e2e/run.mjs",
     "dist": "npm run build && electron-builder --config electron-builder.yml"
   },
   "dependencies": {

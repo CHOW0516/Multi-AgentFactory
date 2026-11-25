@@ -41,3 +41,12 @@ e2e/       end-to-end tests (Playwright)
 | P5 | `p5-iso-figures` | Factory floor and Agent map |
 
 Each person only changes files they own (`ownership.json`). Check with `scripts/check-ownership.sh <id>`.
+
+## Operations
+
+- Day-to-day running, backups, restore and the paper fallback: [docs/RUNBOOK.md](docs/RUNBOOK.md).
+- Demo POs: `docker compose up -d simulator` (one every `SIM_PO_INTERVAL_SECONDS`), or one now with
+  `docker compose run --rm simulator python -m app.simulator send-po`.
+- End-to-end tests (after the merge, with the stack running and the desktop built with
+  `VITE_USE_MOCKS=false`): `cd desktop && E2E_PASSWORD=<seed password> npm run e2e`.
+- Installers: `cd desktop && VITE_API_BASE_URL=http://<server>:8000 npm run dist` (build Windows on Windows and macOS on a Mac).
