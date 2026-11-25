@@ -5,7 +5,7 @@ import { activateOnKey } from "../../figures/figure-ui";
 import { floorArt, kindFor } from "../../figures/floor-geometry";
 import { compareDepth } from "../../figures/geometry";
 import { useFigureFrames, useMotionVisibility } from "../../figures/motion";
-import { Icon } from "../../shell/icons";
+import { CameraControls } from "../../figures/CameraControls";
 import { floorProjection, floorViewport, locateInView, projectionAngles } from "./floor-camera";
 import { mechanismTransform, statusNames } from "./model";
 import { useFloorCamera } from "./use-floor-camera";
@@ -117,7 +117,7 @@ export function FloorScene({ machines, approvals, active, onInspect, onHover, ar
     if (!machine) return;
     lastFocus.current = focus;
     const width = scene.current.clientWidth;
-    const offset: [number, number] = width > 760 ? [inspecting ? -152 : 0, 18] : [0, inspecting ? -107 : 0];
+    const offset: [number, number] = width > 760 ? [0, 18] : [0, -20];
     controls.animate(locateInView(view, [machine.floor_x + 55, machine.floor_y + 39, 47], camera, offset));
   }, [focus, camera, controls, inspecting, machines, view]);
 
@@ -215,15 +215,7 @@ export function FloorScene({ machines, approvals, active, onInspect, onHover, ar
         </g>
       </svg>
     </div>
-    <div className="floor-camera-controls floor-panel" role="group" aria-label="Camera controls">
-      <button className="icon-button" aria-label="Zoom in" title="Zoom in" onClick={() => controls.zoom(1.22)} disabled={view.zoom >= 2.75}><Icon name="plus" /></button>
-      <button className="icon-button" aria-label="Zoom out" title="Zoom out" onClick={() => controls.zoom(1 / 1.22)} disabled={view.zoom <= .58}><Icon name="minus" /></button>
-      <span className="floor-camera-divider" />
-      <button className="icon-button" aria-label="Rotate left" title="Rotate left" onClick={() => controls.turn(-30)}><Icon name="rotate-left" /></button>
-      <button className="icon-button" aria-label="Rotate right" title="Rotate right" onClick={() => controls.turn(30)}><Icon name="rotate-right" /></button>
-      <span className="floor-camera-divider" />
-      <button className="icon-button" aria-label="Reset camera" title="Reset camera" onClick={controls.reset}><Icon name="home" /></button>
-    </div>
+    <CameraControls controls={controls} />
   </>;
 }
 

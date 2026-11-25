@@ -1,6 +1,7 @@
 import "./components.css";
 // Modal dialog and a slide-in drawer. Escape closes both; focus moves into them when they open.
 import { useEffect, useRef, type ReactNode } from "react";
+import { Icon } from "../shell/icons";
 
 function useEscapeAndFocus(open: boolean, onClose: () => void) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -66,7 +67,7 @@ export function Drawer({ open, title, onClose, children, testId, wide }: {
         ref={panelRef} data-testid={testId}>
         <div className="drawer-header">
           <h2>{title}</h2>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close">✕</button>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><Icon name="close" size={17} /></button>
         </div>
         <div className="drawer-body">{children}</div>
       </aside>

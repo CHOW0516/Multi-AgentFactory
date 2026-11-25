@@ -32,6 +32,6 @@ export function floorProjection(azimuth: number, elevation: number): Projection 
 
 export function locateInView(view: FloorView, point: Point3, camera: Projection, offset: Pair): FloorView {
   const [x, y] = iso(point, camera);
-  const zoom = 1.65;
+  const zoom = Math.max(1.45, Math.min(view.zoom, 1.85));
   return { ...view, zoom, x: (floorViewport.x - x) * zoom + offset[0], y: (floorViewport.y - y) * zoom + offset[1] };
 }

@@ -2,12 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../../api/client";
 import type { AgentMessageOut, AgentSummary, Page } from "../../api/types";
 import { stationArt } from "../../figures/agent-geometry";
-import { Drawer, formatDateTime, itemsOf, percent, QueryNotice } from "../../figures/figure-ui";
+import { formatDateTime, itemsOf, percent, QueryNotice } from "../../figures/figure-ui";
+import { Inspector } from "../../components/Inspector";
+import { CompactList } from "../../components/CompactList";
 import { messageType, parcelFor, pendingTasks, sortMessages, type Message, type Selection } from "./model";
 
-function MessageItem({ message }: { message: Message }) {
-  return <li>
-    <details>
+function MessageContent({ message }: { message: Message }) {
+  return <details>
       <summary><strong>{message.action.replaceAll("_", " ")}</strong>
         <span className="p5-message-state" data-kind={message.status === "failed" ? "failed" : messageType(message)}>
           {message.status === "failed" ? "failed" : messageType(message)}
@@ -15,11 +16,10 @@ function MessageItem({ message }: { message: Message }) {
         <small>{message.from_agent} → {message.to_agent ?? "event exchange"} · {formatDateTime(message.sent_at)}</small>
       </summary>
       <pre>{JSON.stringify(message, null, 2)}</pre>
-    </details>
-  </li>;
+  </details>;
 }
 
-export function AgentDrawer({ selection, live, onClose }: { selection: Selection; live: Message[]; onClose: () => void }) {
+export function AgentDrawer({ selection, live, onClose, onLocate }: { selection: Selection; live: Message[]; onClose: () => void; onLocate: () => void }) {
   const name = selection.name;
   const station = selection.type === "station";
   const path = `/agents/${encodeURIComponent(name)}`;
@@ -37,33 +37,39 @@ export function AgentDrawer({ selection, live, onClose }: { selection: Selection
   const pending = pendingTasks(recent).filter((message) => message.to_agent === name);
   const stats = summary.data;
 
-  return <Drawer title={`${stationArt[name].label}${station ? "" : " rail"}`} onClose={onClose} testId="agent-drawer">
+  return <Inspector title={`${stationArt[name].label}${station ? "" : " rail"}`} icon="agents" onLocate={onLocate} onClose={onClose} testId="agent-drawer">
     {station && <>
       <QueryNotice pending={summary.isPending} error={summary.isError} retry={() => void summary.refetch()} />
       {stats && <>
-        <p>{stats.job_scope}</p>
+        <p className="agent-scope">{stats.job_scope}</p>
+        <dl className="floor-inspector-metrics">
+          <div><dt>In progress</dt><dd>{stats.in_progress}</dd></div>
+          <div><dt>Queued</dt><dd>{stats.queue_depth}</dd></div>
+        </dl>
         <dl className="p5-details">
-          {([
-            ["Uses an LLM", stats.uses_llm ? "Yes" : "No"], ["Queue depth", stats.queue_depth],
-            ["In progress", stats.in_progress], ["Success rate today", percent(stats.success_rate_today)],
-            ["Average latency", `${Math.round(stats.average_latency_ms)} ms`], ["Tokens today", stats.tokens_today.toLocaleString()],
-            ["Cost today", new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(stats.cost_today_usd)],
-            ["Dead-letter count", stats.dead_letter_count],
-          ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+          <div><dt>Success rate today</dt><dd>{percent(stats.success_rate_today)}</dd></div>
+          <div><dt>Average latency</dt><dd>{Math.round(stats.average_latency_ms)} ms</dd></div>
         </dl>
         <section><h3>Current tasks</h3>
-          <ul className="p5-list">{pending.length ? pending.map((message) => <MessageItem key={message.message_id} message={message} />) :
-            <li>{stats.in_progress ? "No corresponding task appears in the recent messages." : "No tasks in progress."}</li>}</ul>
+          <CompactList items={pending} label="tasks" empty={stats.in_progress ? "No corresponding task appears in the recent messages." : "No tasks in progress."}
+            itemKey={(message) => message.message_id} render={(message) => <MessageContent message={message} />} />
         </section>
+        <details className="inspector-more inspector-section"><summary>Usage & diagnostics</summary>
+          <dl className="p5-details">
+            {([
+              ["Uses an LLM", stats.uses_llm ? "Yes" : "No"], ["Tokens today", stats.tokens_today.toLocaleString()],
+              ["Cost today", new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(stats.cost_today_usd)],
+              ["Dead-letter count", stats.dead_letter_count],
+            ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+          </dl>
+        </details>
       </>}
     </>}
     <section>
       <h3>{station ? "Last 50 messages" : "Recent messages on this link"}</h3>
       <QueryNotice pending={messages.isPending && !recent.length} error={messages.isError} retry={() => void messages.refetch()} />
-      <ul className="p5-list">
-        {recent.map((message) => <MessageItem key={message.message_id} message={message} />)}
-        {messages.isSuccess && !recent.length && <li>No messages yet.</li>}
-      </ul>
+      <CompactList items={recent} label="messages" empty="No messages yet." itemKey={(message) => message.message_id}
+        render={(message) => <MessageContent message={message} />} />
     </section>
-  </Drawer>;
+  </Inspector>;
 }

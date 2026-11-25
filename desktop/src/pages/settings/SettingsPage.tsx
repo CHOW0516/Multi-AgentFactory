@@ -1,3 +1,4 @@
+import { DatePicker } from "../../components/DatePicker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { apiFetch } from "../../api/client";
@@ -205,7 +206,7 @@ function CalendarTab() {
           if (holiday.holiday_date && holiday.name.trim()) createHoliday.mutate(holiday, { onSuccess: () => setHoliday({ holiday_date: "", name: "" }) });
         }}>
           <div className="grid-2">
-            <div className="field"><label htmlFor="holiday-date">Date</label><input id="holiday-date" type="date" value={holiday.holiday_date} onChange={(event) => setHoliday({ ...holiday, holiday_date: event.target.value })} /></div>
+            <div className="field"><label htmlFor="holiday-date">Date</label><DatePicker id="holiday-date" value={holiday.holiday_date} required onChange={(holiday_date) => setHoliday({ ...holiday, holiday_date })} /></div>
             <div className="field"><label htmlFor="holiday-name">Name</label><input id="holiday-name" value={holiday.name} onChange={(event) => setHoliday({ ...holiday, name: event.target.value })} /></div>
           </div>
           <button type="submit" className="button" disabled={createHoliday.isPending || !holiday.holiday_date || !holiday.name.trim()}>Add holiday</button>

@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "desktop/src/components/components.css"
+        ],
+        "createdAt": "2026-11-25T15:48:06.837Z",
+        "reason": "Agent review: all three findings exist unchanged in Git HEAD. Two stripes identify warning/action table rows; the neutral timeline border connects chronological events. These are semantic status/navigation cues, not decorative card accents."
+      }
+    ]
+  }
+}

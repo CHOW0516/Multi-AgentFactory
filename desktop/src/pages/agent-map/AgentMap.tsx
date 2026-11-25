@@ -2,9 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { apiFetch, USE_MOCKS, useLiveEvents } from "../../api/client";
 import type { AgentMessageEventData, AgentMessageOut, AgentSummary, HealthOut, OrderSummary, Page } from "../../api/types";
-import { stations, type MapAgent, type Station } from "../../figures/agent-geometry";
+import { stationArt, stations, type MapAgent, type Station } from "../../figures/agent-geometry";
 import { demoOrders, useDemoEvents } from "../../figures/demo-events";
-import { FigureCard, FigurePage, itemsOf, Metrics, QueryNotice } from "../../figures/figure-ui";
+import { itemsOf, QueryNotice } from "../../figures/figure-ui";
+import { SceneMetric } from "../factory-floor/FactoryFloor";
+import { Icon } from "../../shell/icons";
+import { useThemeStore } from "../../theme/theme-store";
+import "./agent-map.css";
 import { AgentDrawer } from "./AgentDrawer";
 import { MapScene, type ReplayMotion } from "./MapScene";
 import { pendingTasks, replayPlan, type Message, type Selection } from "./model";
@@ -61,6 +65,12 @@ export function AgentMap() {
     queryKey: ["p5", "orders"], queryFn: async ({ signal }) => USE_MOCKS ? demoOrders :
       itemsOf(await apiFetch<OrderSummary[] | Page<OrderSummary>>("/orders?page=1&page_size=100", { signal })),
   });
+  const theme = useThemeStore((state) => state.theme);
+  const restoreFocus = useRef<HTMLElement | SVGElement | null>(null);
+  const [focus, setFocus] = useState<Selection | null>(null);
+  const [search, setSearch] = useState("");
+  const [rosterOpen, setRosterOpen] = useState(() => window.matchMedia?.("(min-width: 720px)")?.matches ?? true);
+  const [hover, setHover] = useState<MapAgent | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [order, setOrder] = useState("");
   const [playing, setPlaying] = useState(false);
@@ -81,8 +91,20 @@ export function AgentMap() {
     queryFn: async ({ signal }) => itemsOf(await apiFetch<AgentMessageOut[] | Page<AgentMessageOut>>(`/orders/${encodeURIComponent(order)}/messages`, { signal })),
   });
   const plan = useMemo(() => replayPlan(history.data ?? emptyMessages), [history.data]);
-  const onStation = useCallback((name: MapAgent) => setSelection({ type: "station", name }), []);
-  const onRail = useCallback((name: Station) => setSelection({ type: "rail", name }), []);
+  const inspect = useCallback((next: Selection) => {
+    const trigger = document.activeElement;
+    if ((trigger instanceof HTMLElement || trigger instanceof SVGElement) && trigger !== document.body && !trigger.closest(".floor-inspector")) restoreFocus.current = trigger;
+    setSelection(next); setFocus(next);
+  }, []);
+  const onStation = useCallback((name: MapAgent) => inspect({ type: "station", name }), [inspect]);
+  const onRail = useCallback((name: Station) => inspect({ type: "rail", name }), [inspect]);
+  const closeInspector = () => {
+    setSelection(null);
+    requestAnimationFrame(() => {
+      if (restoreFocus.current?.isConnected) restoreFocus.current.focus({ preventScroll: true });
+      else document.querySelector<SVGSVGElement>(".agent-workspace .floor-model")?.focus({ preventScroll: true });
+    });
+  };
   const onEnd = useCallback(() => setPlaying(false), []);
 
   const writeTime = useCallback((next: number) => {
@@ -111,21 +133,43 @@ export function AgentMap() {
   const liveTasks = pendingTasks(recent).length;
   const activeTasks = Math.max(inProgress ?? 0, liveTasks);
 
-  return <FigurePage title="Agent map" description="Follow work between the orchestrator and its agents, or replay a single order.">
-    <Metrics items={[
-      ["Messages / min", rate], ["Tasks in progress", summary.data || liveTasks ? activeTasks : "—"],
-      ["Failures observed today", failed],
-    ]} />
-    <QueryNotice pending={summary.isPending} error={summary.isError} retry={() => void summary.refetch()} />
-    <FigureCard number={2} title="Agent map" hint="Click a station"
-      readout={`${rate}/min · ${activeTasks} in progress · ${failed} observed failures`}
-      caption={<span className="p5-legend">
-        <span>RabbitMQ conveyor</span><span>PostgreSQL vault</span><span>Counter shows queued | in progress</span>
-        {["task", "result", "event", "failed"].map((kind) =>
-          <span key={kind}><i className="p5-parcel-key" data-kind={kind} />{kind === "failed" ? "Failed result" : kind[0].toUpperCase() + kind.slice(1)}</span>)}
-      </span>}>
-      <MapScene names={names} summaries={summary.data ?? []} live={recent} replay={motion} onStation={onStation} onRail={onRail} />
-    </FigureCard>
+  return <section className="floor-workspace agent-workspace p5-page iso" data-theme={theme} data-inspecting={Boolean(selection) || undefined}
+    onKeyDown={(event) => { if (event.key === "Escape" && selection) { event.stopPropagation(); closeInspector(); } }}>
+    <MapScene names={names} summaries={summary.data ?? []} live={recent} replay={motion}
+      onStation={onStation} onRail={onRail} focus={focus} selection={selection} hover={hover} onHover={setHover} />
+    <header className="floor-overview">
+      <h1>Agent map</h1>
+      <dl className="floor-metrics">
+        <SceneMetric icon="agents" label="Messages / min" value={rate} />
+        <SceneMetric icon="orders" label="Tasks in progress" value={summary.data || liveTasks ? activeTasks : "—"} />
+        <SceneMetric icon="quality" label="Failures observed today" value={failed} />
+      </dl>
+      <QueryNotice pending={summary.isPending} error={summary.isError} retry={() => void summary.refetch()} />
+    </header>
+    <div className="floor-guide floor-panel">
+      <div className="floor-guide-title"><Icon name="orbit" size={17} />
+        <span className="floor-pointer-hint">Drag to orbit · Shift + drag to pan · Scroll to zoom</span>
+        <span className="floor-touch-hint">Drag to orbit · Pinch to zoom</span>
+      </div>
+      <div className="floor-legend">{["task", "result", "event", "failed"].map((kind) =>
+        <span key={kind}><i className="p5-parcel-key" data-kind={kind} />{kind === "failed" ? "Failed result" : kind[0].toUpperCase() + kind.slice(1)}</span>)}</div>
+      {hover && !selection && <div className="floor-hover-info"><strong>{stationArt[hover].label}</strong>
+        <span>{summary.data?.find((entry) => entry.name === hover)?.in_progress ?? 0} in progress · {summary.data?.find((entry) => entry.name === hover)?.queue_depth ?? 0} queued</span></div>}
+    </div>
+    {!selection && <section className="floor-roster floor-panel" aria-label="Agents in the control room">
+      <button type="button" className="floor-roster-heading" aria-expanded={rosterOpen} onClick={() => setRosterOpen(!rosterOpen)}>
+        <span className="floor-tile-icon"><Icon name="agents" size={17} /></span><strong>Agents</strong><span className="floor-roster-count">{names.length + 1}</span><Icon name={rosterOpen ? "chevron-down" : "chevron-up"} size={16} />
+      </button>
+      {rosterOpen && <><label className="floor-search"><Icon name="search" size={15} /><span className="sr-only">Find an agent</span>
+        <input type="search" value={search} placeholder="Find an agent" onChange={(event) => setSearch(event.target.value)} /></label>
+        <ul className="floor-roster-list">{(["orchestrator", ...names] as MapAgent[]).filter((name) => stationArt[name].label.toLowerCase().includes(search.toLowerCase())).map((name) => {
+          const stats = summary.data?.find((entry) => entry.name === name);
+          return <li key={name}><button type="button" onClick={() => onStation(name)}><span><strong>{stationArt[name].label}</strong><small>{stats?.in_progress ?? 0} in progress · {stats?.queue_depth ?? 0} queued</small></span><Icon name="chevron-right" size={14} /></button></li>;
+        })}</ul>
+        {!["orchestrator", ...names].some((name) => stationArt[name as MapAgent].label.toLowerCase().includes(search.toLowerCase())) && <p className="floor-roster-empty">No matching agents.</p>}
+      </>}
+    </section>}
+    <details className="agent-replay floor-panel"><summary><Icon name="history" size={16} />Order replay <Icon name="chevron-down" size={14} /></summary>
     <section aria-label="Order replay" className="p5-replay">
       <div className="p5-replay-field"><label htmlFor={orderControl}>Order replay</label>
         <select id={orderControl} value={order} onChange={(event) => { setPlaying(false); seek(0); setOrder(event.target.value); }}>
@@ -151,7 +195,8 @@ export function AgentMap() {
     <QueryNotice pending={orders.isPending || Boolean(order && history.isPending)} error={orders.isError || history.isError}
       retry={() => void (orders.isError ? orders.refetch() : history.refetch())} />
     {order && history.isSuccess && !plan.ordered.length && <p className="p5-notice">This order has no messages to replay.</p>}
+    </details>
     {selection && <AgentDrawer key={`${selection.type}-${selection.name}`} selection={selection} live={recent}
-      onClose={() => setSelection(null)} />}
-  </FigurePage>;
+      onLocate={() => setFocus({ ...selection })} onClose={closeInspector} />}
+  </section>;
 }

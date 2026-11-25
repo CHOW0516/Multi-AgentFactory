@@ -12,7 +12,9 @@ import { parcelFor, replayPlan } from "../../src/pages/agent-map/model";
 import { FactoryFloor } from "../../src/pages/factory-floor/FactoryFloor";
 import { FloorScene } from "../../src/pages/factory-floor/FloorScene";
 import { installFloorMocks } from "../../src/pages/factory-floor/mocks";
+import { floorProjection, locateInView, initialView } from "../../src/pages/factory-floor/floor-camera";
 import { useAuthStore } from "../../src/shell/auth-store";
+import { CompactList } from "../../src/components/CompactList";
 
 const at = "2026-11-25T00:00:00Z";
 function message(id: string, type: "task" | "result", sent_at = at): AgentMessageEventData {
@@ -51,7 +53,26 @@ afterEach(() => {
 
 const provide = (view: React.ReactNode) => <QueryClientProvider client={client}>{view}</QueryClientProvider>;
 
+it("previews three records and expands and collapses the remaining history", () => {
+  render(<CompactList items={["Job 1", "Job 2", "Job 3", "Job 4", "Job 5"]}
+    itemKey={(item) => item} render={(item) => item} label="jobs" empty="No jobs." />);
+  expect(screen.getByText("Job 3")).toBeVisible();
+  expect(screen.getByText("Job 4")).not.toBeVisible();
+  const disclosure = screen.getByText("Show 2 more jobs");
+  fireEvent.click(disclosure);
+  expect(screen.getByText("Job 5")).toBeVisible();
+  fireEvent.click(screen.getByText("Show fewer jobs"));
+  expect(screen.getByText("Job 4")).not.toBeVisible();
+});
+
 describe("factory floor", () => {
+  it("focuses moderately from far away and preserves a useful close view", () => {
+    const camera = floorProjection(54, 38);
+    const point: [number, number, number] = [400, 300, 40];
+    expect(locateInView({ ...initialView, zoom: .6 }, point, camera, [0, 0]).zoom).toBe(1.45);
+    expect(locateInView({ ...initialView, zoom: 1.8 }, point, camera, [0, 0]).zoom).toBe(1.8);
+    expect(locateInView({ ...initialView, zoom: 2.75 }, point, camera, [0, 0]).zoom).toBeLessThan(2);
+  });
   it("reflects live machine state on the matching stack light", async () => {
     render(provide(<FactoryFloor />));
     const bay = await screen.findByRole("button", { name: /CNC Lathe 1, Running/ });
@@ -72,8 +93,9 @@ describe("factory floor", () => {
     const id = demoMachines.find((entry) => entry.code === "LASER-01")!.id;
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => url.endsWith(`/machines/${id}/overview`))).toBe(true));
     expect(await screen.findByText("Utilisation today")).toBeInTheDocument();
+    await waitFor(() => expect(scene).toHaveAttribute("data-zoom", "1.45"));
     fireEvent.click(within(dialog).getByRole("button", { name: "Focus machine" }));
-    await waitFor(() => expect(scene).toHaveAttribute("data-zoom", "1.65"));
+    await waitFor(() => expect(scene).toHaveAttribute("data-zoom", "1.45"));
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(dialog).not.toBeInTheDocument();
   });
@@ -104,6 +126,19 @@ describe("factory floor", () => {
 });
 
 describe("agent map", () => {
+  it("focuses a station in a non-modal inspector and keeps the camera usable", async () => {
+    render(provide(<AgentMap />));
+    const scene = screen.getByRole("group", { name: /interactive isometric agent control room/i });
+    fireEvent.click(await screen.findByRole("button", { name: "Planning station" }));
+    const inspector = await screen.findByRole("dialog", { name: "Planning" });
+    expect(inspector.tagName).toBe("SECTION");
+    await waitFor(() => expect(scene).toHaveAttribute("data-zoom", "1.45"));
+    const startingAngle = scene.getAttribute("data-azimuth");
+    fireEvent.click(screen.getByRole("button", { name: "Rotate right" }));
+    await waitFor(() => expect(scene).not.toHaveAttribute("data-azimuth", startingAngle));
+    fireEvent.keyDown(inspector, { key: "Escape" });
+    expect(inspector).not.toBeInTheDocument();
+  });
   it("creates one token on the destination rail for one live task", async () => {
     const { container } = render(provide(<AgentMap />));
     await screen.findByRole("button", { name: "Planning station" });

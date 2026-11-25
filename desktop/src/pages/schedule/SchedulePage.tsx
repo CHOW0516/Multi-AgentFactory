@@ -1,3 +1,4 @@
+import { DatePicker } from "../../components/DatePicker";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -100,10 +101,9 @@ export function SchedulePage() {
               <Icon name="chevron-right" size={17} />
             </button>
           </div>
-          <label className="schedule-date">
-            <span className="sr-only">Date</span>
-            <input type="date" value={date} onChange={(event) => selectDay(event.target.value)} />
-          </label>
+          <div className="schedule-date">
+            <DatePicker aria-label="Date" value={date} required onChange={selectDay} />
+          </div>
           <button className="button" type="button" title="Go to today and the current time" onClick={() => {
             setPicked(null);
             setJump((value) => value + 1);

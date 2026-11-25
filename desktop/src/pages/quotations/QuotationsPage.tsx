@@ -1,3 +1,4 @@
+import { DatePicker } from "../../components/DatePicker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { apiFetch } from "../../api/client";
@@ -147,7 +148,7 @@ function QuotationForm({ quotation, customers, parts, onDone }: {
         <div className="field"><label htmlFor="quote-price">Unit price</label>
           <input id="quote-price" inputMode="decimal" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} /></div>
         <div className="field"><label htmlFor="quote-date">Delivery date</label>
-          <input id="quote-date" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></div>
+          <DatePicker id="quote-date" value={dueDate} onChange={setDueDate} /></div>
       </div>
       <button type="button" className="button" disabled={!partId || !(Number(quantity) > 0) || !dueDate || whatIf.isPending} onClick={() => whatIf.mutate()}>
         {whatIf.isPending ? "Checking…" : "Can we make this date?"}

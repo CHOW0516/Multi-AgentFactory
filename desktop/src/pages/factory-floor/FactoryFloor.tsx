@@ -13,7 +13,7 @@ import "./factory-floor.css";
 
 const emptyMachines: FloorOut["machines"] = [];
 
-function Metric({ icon, label, value }: { icon: string; label: string; value: ReactNode }) {
+export function SceneMetric({ icon, label, value }: { icon: string; label: string; value: ReactNode }) {
   return <div className="floor-metric floor-panel">
     <span className="floor-tile-icon"><Icon name={icon} size={18} /></span>
     <div><dt>{label}</dt><dd>{value}</dd></div>
@@ -69,6 +69,7 @@ export function FactoryFloor() {
     if ((trigger instanceof HTMLElement || trigger instanceof SVGElement) && trigger !== document.body &&
       !trigger.closest(".floor-inspector")) restoreFocus.current = trigger;
     setSelected(id);
+    setFocus({ id });
   }, []);
   const openFromRoster = (id: string) => {
     inspect(id);
@@ -104,14 +105,14 @@ export function FactoryFloor() {
     data-inspecting={Boolean(machine) || undefined} onKeyDown={(event) => {
       if (event.key === "Escape" && machine) { event.stopPropagation(); closeInspector(); }
     }}>
-    {floor.data && <FloorScene machines={machines} approvals={floor.data.pending_approvals} active={hover ?? selected}
+    {floor.data && <FloorScene machines={machines} approvals={floor.data.pending_approvals} active={selected ?? hover}
       onInspect={inspect} onHover={setHover} arrival={arrival} focus={focus} inspecting={Boolean(machine)} />}
     <header className="floor-overview">
       <h1>Factory floor</h1>
       <dl className="floor-metrics">
-        <Metric icon="factory" label="Machines running" value={floor.data ? <>{running}<span> / {machines.length}</span></> : "—"} />
-        <Metric icon="orders" label="Orders in production" value={floor.data?.orders_in_production ?? "—"} />
-        <Metric icon="approvals" label="Pending approvals" value={floor.data?.pending_approvals ?? "—"} />
+        <SceneMetric icon="factory" label="Machines running" value={floor.data ? <>{running}<span> / {machines.length}</span></> : "—"} />
+        <SceneMetric icon="orders" label="Orders in production" value={floor.data?.orders_in_production ?? "—"} />
+        <SceneMetric icon="approvals" label="Pending approvals" value={floor.data?.pending_approvals ?? "—"} />
       </dl>
       <QueryNotice pending={floor.isPending} error={floor.isError} retry={() => void floor.refetch()} />
       {floor.data && machines.length === 0 && <p className="p5-notice">No machines are registered.</p>}
@@ -119,7 +120,7 @@ export function FactoryFloor() {
     {floor.data && <div className="floor-guide floor-panel">
       <div className="floor-guide-title">
         <Icon name="orbit" size={17} />
-        <span className="floor-pointer-hint">Drag to orbit <span>·</span> Scroll to zoom</span>
+        <span className="floor-pointer-hint">Drag to orbit <span>·</span> Shift + drag to pan <span>·</span> Scroll to zoom</span>
         <span className="floor-touch-hint">Drag to orbit <span>·</span> Pinch to zoom</span>
       </div>
       <div className="floor-legend" aria-label="Machine status legend">

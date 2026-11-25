@@ -1,3 +1,4 @@
+import { DatePicker } from "../../components/DatePicker";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -82,7 +83,7 @@ export function OrdersPage() {
         </div>
         <div className="field">
           <label htmlFor="order-due">Due by</label>
-          <input id="order-due" type="date" value={filters.dueBefore} onChange={(event) => update({ dueBefore: event.target.value })} />
+          <DatePicker id="order-due" value={filters.dueBefore} onChange={(dueBefore) => update({ dueBefore })} />
         </div>
         <label className="row small">
           <input type="checkbox" checked={filters.lateRiskOnly} onChange={(event) => update({ lateRiskOnly: event.target.checked })} />

@@ -1,6 +1,7 @@
 // Table with a sticky header, click-to-sort columns, loading / error / empty states.
 import { useMemo, useState, type ReactNode } from "react";
 import { EmptyState, ErrorState, LoadingSkeleton } from "./QueryState";
+import { Icon } from "../shell/icons";
 
 export interface Column<Row> {
   key: string;
@@ -65,7 +66,7 @@ export function DataTable<Row>({
                 aria-sort={sortKey === column.key ? (sortAscending ? "ascending" : "descending") : undefined}>
                 {column.sortValue ? (
                   <button type="button" className="sort-button" onClick={() => toggleSort(column.key)}>
-                    {column.header}{sortKey === column.key ? (sortAscending ? " ▲" : " ▼") : ""}
+                    {column.header}<Icon name={sortKey === column.key && !sortAscending ? "chevron-down" : "chevron-up"} size={13} />
                   </button>
                 ) : column.header}
               </th>

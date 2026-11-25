@@ -1,3 +1,4 @@
+import { DatePicker } from "../../components/DatePicker";
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 import { USE_MOCKS, apiFetch, fileUrl } from "../../api/client";
@@ -80,9 +81,9 @@ export function HistoryPage() {
             <option value="">All</option>{["order", "approval", "material", "quotation", "machine", "user", "setting"].map((entity) => <option key={entity} value={entity}>{entity}</option>)}
           </select></div>
         <div className="field"><label htmlFor="history-from">From</label>
-          <input id="history-from" type="date" value={filters.from} onChange={(event) => update({ from: event.target.value })} /></div>
+          <DatePicker id="history-from" value={filters.from} max={filters.to || undefined} onChange={(from) => update({ from })} /></div>
         <div className="field"><label htmlFor="history-to">To</label>
-          <input id="history-to" type="date" value={filters.to} onChange={(event) => update({ to: event.target.value })} /></div>
+          <DatePicker id="history-to" value={filters.to} min={filters.from || undefined} onChange={(to) => update({ to })} /></div>
       </div>
       {historyQuery.isPending ? <LoadingSkeleton rows={8} /> : historyQuery.isError ? <ErrorState error={historyQuery.error} onRetry={() => void historyQuery.refetch()} />
         : entries.length === 0 ? <EmptyState>Nothing matches these filters.</EmptyState> : (

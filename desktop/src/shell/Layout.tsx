@@ -30,7 +30,7 @@ export function Layout({ routes, children }: { routes: PageRoute[]; children: Re
   const initials = user?.name.split(/\s+/).slice(0, 2).map((word) => word[0]?.toUpperCase()).join("");
 
   return (
-    <div className="shell" data-sidebar-open={sidebarOpen || undefined} data-floor={location.pathname === "/" || undefined}>
+    <div className="shell" data-sidebar-open={sidebarOpen || undefined} data-floor={(location.pathname === "/" || location.pathname === "/agent-map") || undefined}>
       <header className="shell-topbar">
         <button className="icon-button shell-sidebar-toggle" type="button" onClick={() => setSidebarOpen(!sidebarOpen)}
           aria-expanded={sidebarOpen} aria-controls="workspace-navigation"

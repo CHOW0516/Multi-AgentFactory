@@ -58,7 +58,7 @@ try {
   const drawer = page.getByRole("dialog", { name: "CNC Lathe 1" });
   await drawer.getByText("Utilisation today").waitFor();
   await drawer.getByRole("button", { name: "Focus machine" }).click();
-  await page.waitForFunction(() => document.querySelector(".floor-model")?.getAttribute("data-zoom") === "1.65");
+  await page.waitForFunction(() => document.querySelector(".floor-model")?.getAttribute("data-zoom") === "1.45");
   await drawer.getByRole("button", { name: "Set status" }).click();
   await drawer.getByRole("combobox").selectOption("maintenance");
   await drawer.getByRole("button", { name: "Save" }).click();
@@ -100,6 +100,7 @@ try {
   await page.getByRole("dialog", { name: "Planning rail" }).getByText("Recent messages on this link").waitFor();
   await page.keyboard.press("Escape");
 
+  await page.locator(".agent-replay > summary").click();
   const orderReplay = page.getByRole("combobox", { name: "Order replay" });
   await orderReplay.selectOption({ label: "SO-2026-0412" });
   await page.getByLabel("Speed").selectOption("4");

@@ -1,0 +1,219 @@
+{
+  "node_count": 2419,
+  "unverified_node_count": 0,
+  "raw_edge_count": 8233,
+  "non_object_edges": 0,
+  "missing_endpoint_edges": 0,
+  "dangling_endpoint_edges": 544,
+  "self_loop_edges": 1,
+  "valid_candidate_edges": 7689,
+  "exact_duplicate_edges": 79,
+  "directed_unique_endpoint_pairs": 7335,
+  "directed_same_endpoint_collapsed_edges": 354,
+  "undirected_unique_endpoint_pairs": 7334,
+  "undirected_same_endpoint_collapsed_edges": 355,
+  "same_endpoint_group_count": 296,
+  "relation_variant_groups": 232,
+  "source_file_variant_groups": 0,
+  "source_location_variant_groups": 9,
+  "context_variant_groups": 13,
+  "post_build_graph_type": "Graph",
+  "post_build_node_count": 2419,
+  "post_build_edge_count": 7337,
+  "post_build_error": "",
+  "producer_suppression": {
+    "path": "C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\graphify\\extract.py",
+    "total_sites": 12,
+    "sites": [
+      {
+        "line": 1204,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 1520,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 1522,
+        "name": "seen_doc_refs",
+        "tuple_arity": 0,
+        "sample": "seen_doc_refs: set[str] = set()"
+      },
+      {
+        "line": 1885,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 2032,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n.get(\"id\") for n in nodes}"
+      },
+      {
+        "line": 2670,
+        "name": "seen_keys",
+        "tuple_arity": 0,
+        "sample": "seen_keys: set[tuple] = set()"
+      },
+      {
+        "line": 2839,
+        "name": "seen_keys",
+        "tuple_arity": 0,
+        "sample": "seen_keys: set[tuple] = set()"
+      },
+      {
+        "line": 4436,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 4544,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 4623,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 5138,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 5139,
+        "name": "seen_edges",
+        "tuple_arity": 4,
+        "sample": "seen_edges: set[tuple[str, str, str, str | None]] = set()"
+      }
+    ],
+    "error": ""
+  },
+  "examples": [
+    {
+      "source": "backend_app_messaging_core_publish_result",
+      "target": "backend_app_schemas_envelope_envelope",
+      "edge_count": 5,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "backend/app/messaging/core.py"
+      ],
+      "source_locations": [
+        "L174",
+        "L175",
+        "L183"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "parameter_type",
+        "return_type"
+      ]
+    },
+    {
+      "source": "backend_app_agents_material_service_check_and_hold",
+      "target": "backend_app_schemas_contracts_checkandholdresult",
+      "edge_count": 4,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "backend/app/agents/material/service.py"
+      ],
+      "source_locations": [
+        "L203",
+        "L205",
+        "L256"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "return_type"
+      ]
+    },
+    {
+      "source": "backend_app_agents_material_service_recheck_holds",
+      "target": "backend_app_schemas_contracts_recheckresult",
+      "edge_count": 4,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "backend/app/agents/material/service.py"
+      ],
+      "source_locations": [
+        "L292",
+        "L315"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "return_type"
+      ]
+    },
+    {
+      "source": "backend_app_agents_material_service_create_purchase_requests",
+      "target": "backend_app_schemas_contracts_createpurchaserequestsresult",
+      "edge_count": 4,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "backend/app/agents/material/service.py"
+      ],
+      "source_locations": [
+        "L384",
+        "L418"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "return_type"
+      ]
+    },
+    {
+      "source": "backend_app_agents_order_customer_draft_customer_reply",
+      "target": "backend_app_schemas_contracts_draftcustomerreplyresult",
+      "edge_count": 4,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "backend/app/agents/order/customer.py"
+      ],
+      "source_locations": [
+        "L19",
+        "L21",
+        "L35"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "return_type"
+      ]
+    }
+  ]
+}
