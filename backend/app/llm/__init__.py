@@ -1,18 +1,20 @@
 from app.llm.client import (
-    ClaudeResult,
+    AiResult,
     DailyCostLimitReached,
     LlmRefused,
-    call_claude,
+    LlmUnavailable,
+    call_ai,
     document_block,
     image_block,
     model_for,
 )
 
 __all__ = [
-    "ClaudeResult",
+    "AiResult",
     "DailyCostLimitReached",
     "LlmRefused",
-    "call_claude",
+    "LlmUnavailable",
+    "call_ai",
     "document_block",
     "image_block",
     "model_for",

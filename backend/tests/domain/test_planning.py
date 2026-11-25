@@ -20,7 +20,7 @@ def at(day, hour):
 
 
 @pytest.fixture
-async def capacity(db_session, catalog, planning_clock, fake_claude):
+async def capacity(db_session, catalog, planning_clock, fake_ai):
     async def setup(cycle_seconds=3600):
         machine = Machine(code="MILL-01", name="Mill 1", machine_type="milling")
         db_session.add_all(
@@ -41,7 +41,7 @@ async def capacity(db_session, catalog, planning_clock, fake_claude):
         )
         await db_session.commit()
         for _ in range(15):
-            fake_claude.add_response(text="This option fits the available production capacity.")
+            fake_ai.add_response(text="This option fits the available production capacity.")
         return machine
 
     return setup

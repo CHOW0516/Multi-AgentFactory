@@ -5,12 +5,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-import anthropic
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import write_audit
-from app.llm.client import DailyCostLimitReached, LlmRefused, call_claude
+from app.llm.client import DailyCostLimitReached, LlmRefused, LlmUnavailable, call_ai
 from app.models import CustomerMessage, Order, OrderLine, PlanOption
 from app.schemas.contracts import DraftCustomerReplyResult
 
@@ -66,7 +65,8 @@ async def draft_customer_reply(
 
     opening = "Thank you for your purchase order."
     try:
-        response = await call_claude(
+        response = await call_ai(
+            "order",
             "explain",
             [
                 {
@@ -85,7 +85,7 @@ async def draft_customer_reply(
             and "\n" not in sentence
         ):
             opening = sentence
-    except (anthropic.APIError, DailyCostLimitReached, LlmRefused):
+    except (LlmUnavailable, DailyCostLimitReached, LlmRefused):
         logger.info("Using default customer reply wording for order %s", order_id)
     message = CustomerMessage(
         order_id=order_id,

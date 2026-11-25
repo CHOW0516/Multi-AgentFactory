@@ -62,7 +62,7 @@ Extra rules:
 
 ## E. Tech stack (fixed)
 
-Backend: Python 3.12, FastAPI, Uvicorn, Pydantic v2, SQLAlchemy 2 async + asyncpg, Alembic, aio-pika, anthropic SDK, Google OR-Tools (CP-SAT), python-docx, openpyxl, imaplib (stdlib), smtplib (stdlib, simulator only), PyJWT, passlib[bcrypt], reportlab (simulator PO PDFs), pytest, pytest-asyncio, httpx, ruff.
+Backend: Python 3.12, FastAPI, Uvicorn, Pydantic v2, SQLAlchemy 2 async + asyncpg, Alembic, aio-pika, an OpenAI-compatible AI endpoint called with httpx (Grafilab), Google OR-Tools (CP-SAT), python-docx, openpyxl, imaplib (stdlib), smtplib (stdlib, simulator only), PyJWT, passlib[bcrypt], reportlab (simulator PO PDFs), pytest, pytest-asyncio, httpx, ruff.
 Infra: PostgreSQL 16, RabbitMQ 3 (management), **GreenMail** (dev mail server with SMTP + IMAP; Mailpit has no IMAP), Docker Compose.
 Desktop: Electron, Vite, electron-builder, React 18, TypeScript, React Router, TanStack Query, Zustand, Recharts, Anatomy kit (copied to `desktop/src/iso/`), Vitest, React Testing Library, Playwright.
 
