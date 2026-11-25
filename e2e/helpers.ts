@@ -128,7 +128,12 @@ export async function launchDesktop(): Promise<{ app: ElectronApplication; page:
 }
 
 export async function logIn(page: Page, email: string): Promise<void> {
-  await page.getByLabel("Email").fill(email);
+  // The desktop app keeps its session between launches, so an earlier test may have left it logged in.
+  const emailInput = page.getByLabel("Email");
+  const logOutButton = page.getByRole("button", { name: "Log out" });
+  await expect(emailInput.or(logOutButton)).toBeVisible();
+  if (await logOutButton.isVisible()) await logOutButton.click();
+  await emailInput.fill(email);
   await page.getByLabel("Password").fill(SEED_PASSWORD);
   await page.getByRole("button", { name: /log in|sign in/i }).click();
   await expect(page.getByLabel("Email")).toHaveCount(0);
