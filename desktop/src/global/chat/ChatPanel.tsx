@@ -27,8 +27,10 @@ export function ChatPanel({ stream = streamChat }: { stream?: StreamChat }) {
   async function send(text: string) {
     const question = text.trim();
     if (!question || busy) return;
-    const replyId = Date.now() + 1;
-    setMessages((current) => [...current, { id: Date.now(), from: "you", text: question }, { id: replyId, from: "orchestrator", text: "" }]);
+    // Two separate Date.now() calls can return ids that collide, so derive both from one value.
+    const questionId = Date.now();
+    const replyId = questionId + 0.5;
+    setMessages((current) => [...current, { id: questionId, from: "you", text: question }, { id: replyId, from: "orchestrator", text: "" }]);
     setInput("");
     setBusy(true);
     abortRef.current = new AbortController();
