@@ -247,7 +247,7 @@ function DemoTab() {
   return (
     <div className="card compact" style={{ maxWidth: 560 }}>
       <h2 className="section-title">Reset demo data</h2>
-      <p className="small">Deletes every order, approval and stock movement and loads the demo factory again. Only possible in demo mode.</p>
+      <p className="small">Deletes every order, approval and stock movement and loads the demo factory again. Everyone, including you, must log in again afterwards. Only possible in demo mode.</p>
       {reset.isSuccess ? <p className="small" role="status">✓ Demo data was reset.</p> : null}
       {reset.isError ? <p className="error-text" role="alert">Could not reset: {reset.error.message}</p> : null}
       <button type="button" className="button button-danger" disabled={reset.isPending} onClick={() => setConfirming(true)}>Reset demo data</button>
