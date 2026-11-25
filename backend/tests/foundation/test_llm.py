@@ -80,9 +80,9 @@ async def test_call_records_cost_and_parses_json(fake_ai, ai_settings, db_sessio
     request = fake_ai.requests[0]
     assert request["model"] == "gemini/gemini-3.8-flash"
     assert request["messages"][0] == {"role": "system", "content": "Read the PO."}
-    assert request["messages"][1]["content"][0]["file"]["file_data"].startswith(
-        "data:application/pdf;base64,"
-    )
+    pdf_part = request["messages"][1]["content"][0]
+    assert pdf_part["type"] == "image_url"
+    assert pdf_part["image_url"]["url"].startswith("data:application/pdf;base64,")
     assert request["response_format"]["type"] == "json_schema"
     row = await db_session.scalar(select(LlmCall))
     assert row.purpose == "extraction" and row.tokens_in == 500 and row.model == "gemini/gemini-3.8-flash"

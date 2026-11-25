@@ -62,7 +62,7 @@ async def test_extract_fixture(fixture, catalog, fake_ai, fake_broker, db_sessio
     req = fake_ai.requests[0]
     assert req["messages"][0]["role"] == "system"
     blocks = req["messages"][1]["content"]
-    expected_type = {".pdf": "file", ".png": "image_url"}.get(fixture.suffix, "text")
+    expected_type = {".pdf": "image_url", ".png": "image_url"}.get(fixture.suffix, "text")
     assert blocks[0]["type"] == expected_type
     if expected_type == "text":
         assert "PX-14" in blocks[0]["text"]

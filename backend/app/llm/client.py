@@ -82,10 +82,9 @@ def _content_part(block: dict) -> dict:
     if block["type"] == "text":
         return {"type": "text", "text": block["text"]}
     data_url = f"data:{block['media_type']};base64,{block['data']}"
-    if block["type"] == "image":
+    # Grafilab rejects "file" parts but reads PDFs sent as an image_url data URL (checked 2026-11-25).
+    if block["type"] in ("image", "document"):
         return {"type": "image_url", "image_url": {"url": data_url}}
-    if block["type"] == "document":
-        return {"type": "file", "file": {"filename": "document.pdf", "file_data": data_url}}
     raise ValueError(f"Unsupported content block: {block['type']}")
 
 
