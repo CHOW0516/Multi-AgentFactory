@@ -49,15 +49,16 @@ export function registerMock(method: HttpMethod, path: string, handler: MockHand
   mockRoutes.push({ method, pattern, keys, handler });
 }
 
-let mocksLoaded = false;
-function loadMocks(): void {
-  if (mocksLoaded) return;
-  mocksLoaded = true;
-  import.meta.glob("../**/mocks.ts", { eager: true });
+// Loaded lazily on the first mocked request. An eager glob would run every mocks.ts before
+// this module finished initialising (mocks.ts imports registerMock from here).
+let mocksLoading: Promise<unknown> | null = null;
+function loadMocks(): Promise<unknown> {
+  mocksLoading ??= Promise.all(Object.values(import.meta.glob("../**/mocks.ts")).map((load) => load()));
+  return mocksLoading;
 }
 
 async function answerFromMock(method: HttpMethod, path: string, body: unknown): Promise<unknown> {
-  loadMocks();
+  await loadMocks();
   const [pathname, search = ""] = path.split("?");
   for (const route of mockRoutes) {
     const match = route.method === method ? route.pattern.exec(pathname) : null;
