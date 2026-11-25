@@ -37,7 +37,7 @@ export function AgentDrawer({ selection, live, onClose }: { selection: Selection
   const pending = pendingTasks(recent).filter((message) => message.to_agent === name);
   const stats = summary.data;
 
-  return <Drawer title={`${stationArt[name].label}${station ? "" : " rail"}`} onClose={onClose}>
+  return <Drawer title={`${stationArt[name].label}${station ? "" : " rail"}`} onClose={onClose} testId="agent-drawer">
     {station && <>
       <QueryNotice pending={summary.isPending} error={summary.isError} retry={() => void summary.refetch()} />
       {stats && <>
