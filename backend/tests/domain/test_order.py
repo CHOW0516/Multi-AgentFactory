@@ -174,7 +174,7 @@ async def test_imap_skips_duplicate_message_id(catalog, monkeypatch, db_session,
 async def test_email_retries_after_commit_without_a_second_order(
     catalog, monkeypatch, db_session, fake_broker
 ):
-    metadata, files = mail.message_parts(sample_email())
+    metadata, files, _ = mail.message_parts(sample_email())
     real_publish = events.publish_event
 
     async def unavailable(*args, **kwargs):

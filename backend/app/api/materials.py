@@ -128,6 +128,36 @@ async def save_movement(session: AsyncSession, movement: StockMovement, user: Us
     )
 
 
+async def consume_holds(session: AsyncSession, order_id: UUID, material_id: UUID, quantity, user: User):
+    """Issued material is no longer reserved: reduce the order's holds by the issued quantity.
+    Without this the issue lowers stock and the hold stays, so available stock drops twice."""
+    remaining = quantity
+    holds = await session.scalars(
+        select(StockHold)
+        .where(StockHold.order_id == order_id, StockHold.material_id == material_id)
+        .order_by((StockHold.hold_type == "firm").desc(), StockHold.created_at, StockHold.id)
+    )
+    for hold in holds:
+        if remaining <= 0:
+            break
+        used = min(hold.quantity, remaining)
+        remaining -= used
+        before, left = hold.quantity, hold.quantity - used
+        if left == 0:
+            await session.delete(hold)
+        else:
+            hold.quantity = left
+        await write_audit(
+            session,
+            user,
+            "consume_hold",
+            "stock_holds",
+            hold.id,
+            {"quantity": str(before)},
+            {"quantity": str(left), "order_id": str(order_id)},
+        )
+
+
 @router.post("/stock-movements", response_model=StockMovementOut, status_code=201)
 async def add_movement(
     body: StockMovementIn,
@@ -154,6 +184,8 @@ async def add_movement(
     await lock_material(session, body.material_id)
     row = StockMovement(**values, user_id=user.id)
     await save_movement(session, row, user)
+    if kind == "issue" and body.order_id is not None:
+        await consume_holds(session, body.order_id, body.material_id, abs(body.quantity), user)
     await session.commit()
     return row
 

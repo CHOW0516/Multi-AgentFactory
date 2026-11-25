@@ -19,17 +19,18 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, time
+from datetime import datetime, time
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any, Literal
+from zoneinfo import ZoneInfo
 
 import httpx
 from sqlalchemy import func, select
 
 from app.core.config import settings
 from app.core.db import session_scope
-from app.llm.pricing import cost_usd
+from app.llm.pricing import cost_usd, prices
 from app.llm.usage import add_usage
 from app.models import AppSetting, LlmCall
 
@@ -52,6 +53,14 @@ class LlmRefused(RuntimeError):
 
 class LlmUnavailable(RuntimeError):
     """The provider could not be reached or returned an error."""
+
+    def __init__(self, message: str, retryable: bool = True):
+        super().__init__(message)
+        self.retryable = retryable  # False for 4xx errors (bad request, auth), which repeat on retry
+
+
+class LlmTruncated(RuntimeError):
+    """The reply hit max_tokens, so structured output is incomplete. Retrying gives the same result."""
 
 
 @dataclass
@@ -178,7 +187,10 @@ async def post_chat_completion(request: dict) -> dict:
     except httpx.HTTPError as error:
         raise LlmUnavailable(f"AI provider not reachable: {error}") from error
     if response.status_code >= 400:
-        raise LlmUnavailable(f"AI provider returned {response.status_code}: {response.text[:300]}")
+        retryable = response.status_code in (408, 409, 429) or response.status_code >= 500
+        raise LlmUnavailable(
+            f"AI provider returned {response.status_code}: {response.text[:300]}", retryable=retryable
+        )
     return response.json()
 
 
@@ -191,17 +203,28 @@ async def daily_limit_usd() -> Decimal:
     return Decimal(override) if override is not None else Decimal(str(settings.llm_daily_cost_limit_usd))
 
 
-async def spent_today_usd() -> Decimal:
-    start_of_day = datetime.combine(datetime.now(UTC).date(), time.min, tzinfo=UTC)
+async def spent_today_usd(purposes: set[str] | None = None) -> Decimal:
+    """Spend since midnight in the factory's time zone (not UTC), optionally for some purposes only."""
+    zone = ZoneInfo(settings.app_timezone)
+    start_of_day = datetime.combine(datetime.now(zone).date(), time.min, tzinfo=zone)
+    query = select(func.coalesce(func.sum(LlmCall.cost_usd), 0)).where(LlmCall.created_at >= start_of_day)
+    if purposes:
+        query = query.where(LlmCall.purpose.in_(purposes))
     async with session_scope() as session:
-        total = await session.scalar(
-            select(func.coalesce(func.sum(LlmCall.cost_usd), 0)).where(LlmCall.created_at >= start_of_day)
-        )
+        total = await session.scalar(query)
     return Decimal(total)
 
 
 async def check_daily_limit(purpose: Purpose) -> None:
     if purpose in CRITICAL_PURPOSES:
+        # PO reading keeps working after the general limit, but has its own cap so a flood of
+        # emails cannot spend without limit.
+        if await spent_today_usd(CRITICAL_PURPOSES) >= Decimal(
+            str(settings.llm_extraction_daily_cost_limit_usd)
+        ):
+            raise DailyCostLimitReached(
+                "AI daily cost limit for PO reading reached; new POs wait until tomorrow"
+            )
         return
     if await spent_today_usd() >= await daily_limit_usd():
         raise DailyCostLimitReached(
@@ -248,6 +271,9 @@ async def call_ai(
     """Call the agent's model once. Raises DailyCostLimitReached, LlmRefused or LlmUnavailable."""
     await check_daily_limit(purpose)
     model = model_for(agent)
+    if model not in prices():
+        # A model without a price would count as free and slip past the daily cost limit.
+        raise LlmUnavailable(f"No price for AI model '{model}'; add it to AI_PRICES", retryable=False)
     request: dict[str, Any] = {
         "model": model,
         "max_tokens": max_tokens or settings.llm_max_tokens,
@@ -273,5 +299,7 @@ async def call_ai(
         raise LlmRefused(f"The AI declined the {purpose} request")
 
     text = "".join(block.text for block in reply.content if block.type == "text")
+    if response_schema and reply.stop_reason == "length":
+        raise LlmTruncated(f"The {purpose} reply was cut off at {request['max_tokens']} tokens")
     data = parse_json_text(text) if response_schema and text else None
     return AiResult(reply, text, data, tokens_in, tokens_out, call_cost)

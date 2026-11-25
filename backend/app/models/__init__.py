@@ -5,6 +5,7 @@ from app.models.catalog import BomLine, Material, Part, Quotation, Routing, Supp
 from app.models.factory import Holiday, Machine, MachineEvent, MaintenanceEvent, Shift
 from app.models.inventory import PurchaseRequest, StockHold, StockMovement
 from app.models.orders import (
+    CLOSED_ORDER_STATES,
     FINAL_ORDER_STATES,
     ORDER_STATES,
     Approval,
@@ -47,6 +48,7 @@ __all__ = [
     "PurchaseRequest",
     "StockHold",
     "StockMovement",
+    "CLOSED_ORDER_STATES",
     "FINAL_ORDER_STATES",
     "ORDER_STATES",
     "Approval",

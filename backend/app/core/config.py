@@ -1,15 +1,20 @@
 """Application settings loaded from environment variables (.env)."""
 
+import logging
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+PLACEHOLDER = "change-me"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # App
-    app_mode: str = "demo"
+    app_mode: str = "production"  # set APP_MODE=demo for the simulator and demo reset
     app_name: str = "Factory Commit"
     app_timezone: str = "Asia/Kuala_Lumpur"
     log_level: str = "INFO"
@@ -47,6 +52,7 @@ class Settings(BaseSettings):
     )
     llm_max_tokens: int = 4096
     llm_daily_cost_limit_usd: float = 20.0
+    llm_extraction_daily_cost_limit_usd: float = 10.0  # separate cap for PO reading
 
     # Email
     imap_host: str = "greenmail"
@@ -81,6 +87,21 @@ class Settings(BaseSettings):
     # Backups
     backup_path: str = "/backups"
     backup_cron: str = "0 * * * *"
+
+    @model_validator(mode="after")
+    def refuse_placeholder_secrets(self) -> "Settings":
+        """Production refuses to start with the example secrets; demo mode only warns."""
+        problems = []
+        if len(self.jwt_secret) < 32 or PLACEHOLDER in self.jwt_secret:
+            problems.append("JWT_SECRET must be at least 32 random characters")
+        for name in ("admin_initial_password", "database_url", "rabbitmq_url", "imap_password"):
+            if PLACEHOLDER in getattr(self, name):
+                problems.append(f"{name.upper()} still contains '{PLACEHOLDER}'")
+        if problems and self.app_mode != "demo":
+            raise ValueError("Unsafe settings: " + "; ".join(problems))
+        for problem in problems:
+            logger.warning("Unsafe setting (allowed only in demo mode): %s", problem)
+        return self
 
     @property
     def cors_origins(self) -> list[str]:

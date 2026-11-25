@@ -1,9 +1,10 @@
 """Machine event ingestion and production progress calculations."""
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Protocol
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.core.audit import write_audit
 from app.core.db import session_scope
@@ -12,6 +13,32 @@ from app.orchestrator.outbox import emit
 from app.schemas.contracts import MachineRaw
 
 STATUSES = {"running", "idle", "setup", "down", "maintenance"}
+DOWN_STATUSES = {"down", "maintenance"}
+
+
+async def close_breakdowns(session, machine_id, recovered_at: datetime) -> None:
+    """End every breakdown still open at recovery time, so planning can use the machine again."""
+    open_breakdowns = await session.scalars(
+        select(MaintenanceEvent).where(
+            MaintenanceEvent.machine_id == machine_id,
+            MaintenanceEvent.maintenance_type == "breakdown",
+            MaintenanceEvent.start_at <= recovered_at,
+            or_(MaintenanceEvent.end_at.is_(None), MaintenanceEvent.end_at > recovered_at),
+        )
+    )
+    for breakdown in open_breakdowns:
+        breakdown.end_at = recovered_at
+        hours = (recovered_at - breakdown.start_at).total_seconds() / 3600
+        breakdown.downtime_hours = Decimal(str(round(hours, 2)))
+        await write_audit(
+            session,
+            "monitoring",
+            "close_breakdown",
+            "maintenance_event",
+            breakdown.id,
+            None,
+            {"end_at": recovered_at.isoformat()},
+        )
 
 
 class MachineDataSource(Protocol):
@@ -88,6 +115,8 @@ async def handle(message):
                     {"status": before},
                     {"status": raw.value},
                 )
+                if before in DOWN_STATUSES and raw.value not in DOWN_STATUSES:
+                    await close_breakdowns(session, machine.id, raw.at)
                 if raw.value == "down":
                     breakdown = await session.scalar(
                         select(MaintenanceEvent.id)

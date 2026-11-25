@@ -114,7 +114,7 @@ async def test_failing_handler_retries_then_dead_letters_and_reports(monkeypatch
 
     async def handler(envelope):
         calls.append(1)
-        raise RuntimeError("boom")
+        raise ConnectionError("boom")  # transient, so it is retried
 
     await core.run_consumer("agent.material", handler)
     envelope, _ = task_delivery()
@@ -127,6 +127,26 @@ async def test_failing_handler_retries_then_dead_letters_and_reports(monkeypatch
         select(func.count()).select_from(AgentMessage).where(AgentMessage.status == "failed")
     )
     assert count == 1
+
+
+async def test_permanent_error_is_not_retried(monkeypatch, db_session):
+    import app.messaging.core as core
+
+    monkeypatch.setattr(core, "RETRY_BASE_DELAY_SECONDS", 0)
+    broker = InMemoryBroker(deliver=True)
+    core.set_broker(broker)
+    calls = []
+
+    async def handler(envelope):
+        calls.append(1)
+        raise ValueError("Order requires verified lines")
+
+    await core.run_consumer("agent.material", handler)
+    envelope, _ = task_delivery()
+    await broker.publish("task.material", envelope.model_dump_json().encode())
+    assert len(calls) == 1
+    failed = [json.loads(item.body) for item in broker.published_to("result.orchestrator")]
+    assert failed[0]["payload"]["retryable"] is False
 
 
 async def test_handler_llm_usage_is_reported_on_result(fake_ai, fake_broker, monkeypatch):

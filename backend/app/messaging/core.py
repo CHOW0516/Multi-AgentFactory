@@ -227,6 +227,23 @@ async def _mark_processed(message_id: uuid.UUID, consumer: str) -> None:
         await session.execute(statement.on_conflict_do_nothing(constraint="message_consumer"))
 
 
+def is_transient(error: BaseException) -> bool:
+    """Errors worth retrying: the network, the database connection or an overloaded AI provider.
+    Bad data (ValueError, validation errors, unparseable AI replies) fails the same way every time,
+    so retrying it only repeats the work and the AI cost."""
+    from sqlalchemy.exc import DBAPIError, OperationalError
+
+    from app.llm.client import LlmUnavailable
+
+    if isinstance(error, LlmUnavailable):
+        return error.retryable
+    if isinstance(error, OperationalError):
+        return True
+    if isinstance(error, DBAPIError):
+        return bool(error.connection_invalidated)
+    return isinstance(error, (ConnectionError, TimeoutError, asyncio.TimeoutError, OSError))
+
+
 def make_delivery_handler(consumer: str, handler: EnvelopeHandler, max_attempts: int | None = None):
     """Wraps an envelope handler with schema checks, idempotency, retries and dead-lettering."""
     attempts_allowed = max_attempts or settings.task_max_attempts
@@ -249,15 +266,27 @@ def make_delivery_handler(consumer: str, handler: EnvelopeHandler, max_attempts:
         try:
             await handler(envelope)
         except Exception as error:
-            logger.exception("%s: handler failed on %s (retry %s)", consumer, envelope.action, retry_count)
-            if retry_count + 1 < attempts_allowed:
+            retryable = is_transient(error)
+            logger.exception(
+                "%s: handler failed on %s (retry %s, retryable %s)",
+                consumer,
+                envelope.action,
+                retry_count,
+                retryable,
+            )
+            if retryable and retry_count + 1 < attempts_allowed:
                 await asyncio.sleep(RETRY_BASE_DELAY_SECONDS * (2**retry_count))
                 await get_broker().publish(
                     delivery.routing_key, delivery.body, delivery.headers | {RETRY_HEADER: retry_count + 1}
                 )
                 return True  # the retry copy is now in the queue
             if envelope.type == "task":
-                await publish_result(envelope, "failed", {"error": str(error)[:500]}, notes="Handler failed")
+                await publish_result(
+                    envelope,
+                    "failed",
+                    {"error": str(error)[:500], "retryable": retryable},
+                    notes="Handler failed",
+                )
             return False  # dead-letter the original
         finally:
             current_usage.reset(usage_token)
