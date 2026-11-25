@@ -17,6 +17,21 @@ const PATHS: Record<string, string> = {
   sun: "M12 17a5 5 0 100-10 5 5 0 000 10zM12 1v2m0 18v2M4.2 4.2l1.4 1.4m12.8 12.8l1.4 1.4M1 12h2m18 0h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4",
   moon: "M21 13A9 9 0 1111 3a7 7 0 0010 10z",
   dot: "M12 10a2 2 0 100 4 2 2 0 000-4z",
+  sidebar: "M4 5h16v14H4z M9 5v14 M6.5 8.5h.1m-.1 3h.1m-.1 3h.1",
+  plus: "M12 5v14M5 12h14",
+  minus: "M5 12h14",
+  "rotate-left": "M5 10a7 7 0 1 1 .9 7.9M5 5v5h5",
+  "rotate-right": "M19 10a7 7 0 1 0-.9 7.9M19 5v5h-5",
+  home: "m4 11 8-7 8 7m-2-1v9H6v-9m4 9v-5h4v5",
+  orbit: "M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-4.6-3.4L14 14l-5.4 1.4L10 10z",
+  focus: "M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5m-3-11a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+  close: "m6 6 12 12M6 18 18 6",
+  search: "M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12Zm4.5 10.5 4.5 4.5",
+  "chevron-down": "m6 9 6 6 6-6",
+  "chevron-up": "m6 15 6-6 6 6",
+  "chevron-right": "m9 6 6 6-6 6",
+  "chevron-left": "m15 6-6 6 6 6",
+  clock: "M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm0 4v4l3 2",
 };
 
 export function Icon({ name, size = 18, title }: { name: string; size?: number; title?: string }) {

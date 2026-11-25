@@ -90,6 +90,17 @@ describe("App", () => {
     expect(screen.queryByRole("link", { name: /Materials/ })).not.toBeInTheDocument();
   });
 
+  it("keeps route icons accessible and navigable while collapsed", async () => {
+    useAuthStore.setState({ token: "t", user: manager, ready: true });
+    renderApp();
+    await userEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute("aria-expanded", "false");
+    const approvals = screen.getByRole("link", { name: "Approvals" });
+    expect(approvals).toHaveAttribute("title", "Approvals");
+    await userEvent.click(approvals);
+    expect(screen.getByRole("heading", { name: "Approvals page" })).toBeInTheDocument();
+  });
+
   it("logs out on a 401 from the API", async () => {
     useAuthStore.setState({ token: "expired", user: manager, ready: true });
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ detail: "Not logged in" }), { status: 401 })));

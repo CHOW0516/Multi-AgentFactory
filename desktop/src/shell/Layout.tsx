@@ -1,6 +1,6 @@
 // App frame: sidebar (from discovered routes), top bar, and every src/global/*/index.tsx piece.
-import type { ComponentType, ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { useState, type ComponentType, type ReactNode } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { useThemeStore } from "../theme/theme-store";
 import { useAuthStore } from "./auth-store";
 import { Icon } from "./icons";
@@ -25,35 +25,53 @@ export function Layout({ routes, children }: { routes: PageRoute[]; children: Re
   const theme = useThemeStore((state) => state.theme);
   const toggleTheme = useThemeStore((state) => state.toggle);
   const visibleRoutes = sidebarRoutes(routes, user?.role);
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(() => !(window.matchMedia?.("(max-width: 760px)")?.matches));
+  const initials = user?.name.split(/\s+/).slice(0, 2).map((word) => word[0]?.toUpperCase()).join("");
 
   return (
-    <div className="shell">
-      <aside className="shell-sidebar">
-        <div className="shell-brand"><Icon name="factory" /> Factory Commit</div>
+    <div className="shell" data-sidebar-open={sidebarOpen || undefined} data-floor={location.pathname === "/" || undefined}>
+      <header className="shell-topbar">
+        <button className="icon-button shell-sidebar-toggle" type="button" onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-expanded={sidebarOpen} aria-controls="workspace-navigation"
+          aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"} title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}>
+          <Icon name="sidebar" size={19} />
+        </button>
+        <div className="shell-brand"><span className="shell-brand-icon"><Icon name="factory" size={19} /></span>Factory Commit</div>
+        <div className="spacer" />
+        {globals.map(({ name, Component }) => <Component key={name} />)}
+        <button className="icon-button" type="button" onClick={toggleTheme}
+          aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}>
+          <Icon name={theme === "light" ? "moon" : "sun"} />
+        </button>
+        <div className="shell-user"><span className="shell-avatar" aria-hidden="true">{initials}</span>
+          <span><strong>{user?.name}</strong><small>{user?.role}</small></span>
+        </div>
+        <button className="icon-button" type="button" onClick={logout} aria-label="Log out" title="Log out">
+          <Icon name="logout" />
+        </button>
+      </header>
+      {sidebarOpen && <button type="button" aria-label="Dismiss navigation" className="shell-scrim" onClick={() => setSidebarOpen(false)} />}
+      <aside className="shell-sidebar" id="workspace-navigation" onKeyDown={(event) => {
+        if (event.key === "Escape" && sidebarOpen) {
+          setSidebarOpen(false);
+          event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(".shell-sidebar-toggle")?.focus();
+        }
+      }}>
+        <span className="shell-nav-title">Workspace</span>
         <nav className="shell-nav" aria-label="Main">
           {visibleRoutes.map((route) => (
-            <NavLink key={route.path} to={route.path} end={route.path === "/"}>
-              <Icon name={route.icon} /> {route.label}
+            <NavLink key={route.path} to={route.path} end={route.path === "/"}
+              title={sidebarOpen ? undefined : route.label} aria-label={route.label} onClick={() => {
+              if (window.matchMedia?.("(max-width: 760px)")?.matches) setSidebarOpen(false);
+            }}>
+              <Icon name={route.icon} /><span>{route.label}</span>
             </NavLink>
           ))}
           {visibleRoutes.length === 0 ? <p className="empty-state">No pages yet</p> : null}
         </nav>
       </aside>
-      <div className="shell-main">
-        <header className="shell-topbar">
-          <div className="spacer" />
-          {globals.map(({ name, Component }) => <Component key={name} />)}
-          <button className="icon-button" type="button" onClick={toggleTheme}
-            aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}>
-            <Icon name={theme === "light" ? "moon" : "sun"} />
-          </button>
-          <span className="shell-user">{user?.name} · {user?.role}</span>
-          <button className="icon-button" type="button" onClick={logout} aria-label="Log out">
-            <Icon name="logout" />
-          </button>
-        </header>
-        <main className="shell-content">{children}</main>
-      </div>
+      <main className="shell-content">{children}</main>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 /* Shared styles for P4 pages and panels. Uses only P1 theme tokens. */
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); }
-.page-header h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.page-header h1 { margin: 0; font-size: 25px; font-weight: 700; letter-spacing: -.035em; }
 .page-header p { margin: var(--space-1) 0 0; }
 .page-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .muted { color: var(--color-text-muted); }
