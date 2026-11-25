@@ -2,34 +2,36 @@
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
-  --color-bg: #f7f7f5;
+  --color-bg: #eef3fb;
   --color-surface: #ffffff;
-  --color-surface-muted: #f1f1ee;
-  --color-border: #e3e3de;
-  --color-text: #1d1f22;
-  --color-text-muted: #61656b;
-  --color-accent: #2f5bd3;          /* the one "needs action" colour */
-  --color-accent-soft: #e6ecfb;
+  --color-surface-muted: #f2f6fd;
+  --color-border: #dbe5f3;
+  --color-text: #142440;
+  --color-text-muted: #536781;
+  --color-accent: #2558d4;
+  --color-accent-soft: #e5edff;
+  --color-overlay: #fbfdfff5;
   --color-danger: #c4382f;
-  --color-focus: #2f5bd3;
+  --color-focus: #2558d4;
   --status-running: #2e9d57;
   --status-idle: #8b9097;
   --status-setup: #d39a1c;
   --status-down: #d23c33;
   --status-maintenance: #3778d6;
-  --shadow-card: 0 1px 2px rgba(20, 22, 26, 0.06), 0 1px 1px rgba(20, 22, 26, 0.04);
+  --shadow-card: 0 2px 6px #15377309, 0 10px 28px #2446780c;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #121417;
-  --color-surface: #1a1d21;
-  --color-surface-muted: #22262b;
-  --color-border: #2e3339;
-  --color-text: #e9eaec;
-  --color-text-muted: #9aa0a7;
-  --color-accent: #7d9cf0;
-  --color-accent-soft: #24314f;
+  --color-bg: #111b2c;
+  --color-surface: #1a283e;
+  --color-surface-muted: #23344e;
+  --color-border: #314562;
+  --color-text: #e8f0ff;
+  --color-text-muted: #aebed7;
+  --color-accent: #9abaff;
+  --color-accent-soft: #263d68;
+  --color-overlay: #1a283ef5;
   --color-danger: #ef6b62;
   --color-focus: #7d9cf0;
   --status-running: #4cc27a;
@@ -41,8 +43,8 @@
 }
 
 :root {
-  --radius: 10px;
-  --radius-small: 6px;
+  --radius: 13px;
+  --radius-small: 8px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -51,6 +53,6 @@
   --space-6: 32px;
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
-  --sidebar-width: 224px;
-  --topbar-height: 56px;
+  --sidebar-width: 215px;
+  --topbar-height: 61px;
 }

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { __answerFromMockForTests, emitMockEvent } from "../../src/api/client";
@@ -65,12 +65,30 @@ describe("factory floor", () => {
 
   it("opens the overview for the clicked machine", async () => {
     render(provide(<FactoryFloor />));
-    fireEvent.click(await screen.findByRole("button", { name: /Fiber Laser Cutter/ }));
+    const scene = await screen.findByRole("group", { name: /interactive isometric factory floor/i });
+    fireEvent.click(await within(scene).findByRole("button", { name: /Fiber Laser Cutter/ }));
     const dialog = await screen.findByRole("dialog", { name: "Fiber Laser Cutter" });
     expect(dialog).toBeInTheDocument();
     const id = demoMachines.find((entry) => entry.code === "LASER-01")!.id;
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => url.endsWith(`/machines/${id}/overview`))).toBe(true));
     expect(await screen.findByText("Utilisation today")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Focus machine" }));
+    await waitFor(() => expect(scene).toHaveAttribute("data-zoom", "1.65"));
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(dialog).not.toBeInTheDocument();
+  });
+
+  it("orbits and zooms independently and can reset the camera", async () => {
+    render(provide(<FactoryFloor />));
+    const scene = await screen.findByRole("group", { name: /interactive isometric factory floor/i });
+    const startingAngle = scene.getAttribute("data-azimuth");
+    fireEvent.click(screen.getByRole("button", { name: "Rotate left" }));
+    await waitFor(() => expect(scene).not.toHaveAttribute("data-azimuth", startingAngle));
+    fireEvent.keyDown(scene, { key: "+" });
+    await waitFor(() => expect(scene).toHaveAttribute("data-zoom", "1.20"));
+    fireEvent.click(screen.getByRole("button", { name: "Reset camera" }));
+    await waitFor(() => expect(scene).toHaveAttribute("data-zoom", "1.00"));
+    expect(scene).toHaveAttribute("data-azimuth", startingAngle);
   });
 
   it("paints a delivery cart behind the bay when it stops on the far side", () => {

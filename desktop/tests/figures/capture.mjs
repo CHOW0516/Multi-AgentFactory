@@ -40,11 +40,25 @@ try {
   await login(page);
   await shot(page, "floor-light");
   await closeups(page, "[data-machine]", "floor-light-machine");
+  const floor = page.locator(".floor-model");
+  const homeAngle = await floor.getAttribute("data-azimuth");
+  await page.getByRole("button", { name: "Rotate right" }).click();
+  await page.waitForFunction((angle) => document.querySelector(".floor-model")?.getAttribute("data-azimuth") === String((Number(angle) + 30) % 360), homeAngle);
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await page.waitForFunction(() => document.querySelector(".floor-model")?.getAttribute("data-zoom") === "1.22");
+  await shot(page, "floor-orbit");
+  await page.getByRole("button", { name: "Reset camera" }).click();
+  await page.waitForFunction((angle) => {
+    const scene = document.querySelector(".floor-model");
+    return scene?.getAttribute("data-azimuth") === angle && scene.getAttribute("data-zoom") === "1.00";
+  }, homeAngle);
   const lathe = page.getByRole("button", { name: /^CNC Lathe 1,/ });
   await lathe.focus();
   await page.keyboard.press("Enter");
   const drawer = page.getByRole("dialog", { name: "CNC Lathe 1" });
   await drawer.getByText("Utilisation today").waitFor();
+  await drawer.getByRole("button", { name: "Focus machine" }).click();
+  await page.waitForFunction(() => document.querySelector(".floor-model")?.getAttribute("data-zoom") === "1.65");
   await drawer.getByRole("button", { name: "Set status" }).click();
   await drawer.getByRole("combobox").selectOption("maintenance");
   await drawer.getByRole("button", { name: "Save" }).click();
@@ -62,6 +76,10 @@ try {
   await drawer.getByRole("button", { name: "Save" }).click();
   await drawer.getByText("Spindle vibration", { exact: false }).waitFor();
   await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  assert(await page.getByRole("navigation", { name: "Main" }).isVisible());
+  assert.equal(await page.getByRole("link", { name: "Agent map" }).getAttribute("title"), "Agent map");
+  await page.getByRole("button", { name: "Expand sidebar" }).click();
 
   await page.getByRole("link", { name: "Agent map" }).click();
   const plan = page.getByRole("button", { name: "Planning station" });

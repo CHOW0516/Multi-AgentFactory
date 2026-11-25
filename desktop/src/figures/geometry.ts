@@ -4,7 +4,7 @@ import {
 } from "../iso/iso-kit";
 
 export const canvas = { width: 1200, height: 610 };
-export type Ink = "deck" | "enamel" | "steel" | "rubber" | "kraft" | "glass" | "track" | "screen";
+export type Ink = "deck" | "enamel" | "steel" | "rubber" | "kraft" | "glass" | "track" | "screen" | "blue" | "road";
 
 export function roomCamera(width: number, depth: number, height: number) {
   const camera = fitProjection(boxCorners({ x: 0, y: 0, w: width, d: depth, r: 0 }, 0, height),
