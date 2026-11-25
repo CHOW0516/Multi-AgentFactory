@@ -9,16 +9,16 @@ Fixtures:
   users                   one User per role: users["manager"], users["sales"], ...
   auth_headers(role)      {"Authorization": "Bearer ..."} for that role's user
   fake_broker             InMemoryBroker installed for app.messaging (autouse; .published records everything)
-  fake_claude             FakeClaude installed for app.llm (queue responses with .add_response)
+  fake_ai                 FakeAi installed for app.llm (queue responses with .add_response)
 """
 
 import asyncio
+import json
 import os
 import subprocess
 import sys
 from collections.abc import AsyncIterator
 from pathlib import Path
-from types import SimpleNamespace
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+asyncpg://factory:factory@localhost:5432/factory_test"
@@ -131,14 +131,14 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
         yield test_client
 
 
-class FakeClaude:
-    """Stands in for anthropic.AsyncAnthropic. Queue responses with add_response; inspect .requests."""
+class FakeAi:
+    """Stands in for the AI provider. Queue replies with add_response; inspect .requests (OpenAI format)."""
+
+    FINISH_REASONS = {"end_turn": "stop", "tool_use": "tool_calls", "refusal": "content_filter"}
 
     def __init__(self) -> None:
-        self.responses: list[SimpleNamespace] = []
+        self.responses: list[dict] = []
         self.requests: list[dict] = []
-        self.messages = SimpleNamespace(create=self._create)
-        self.beta = SimpleNamespace(messages=SimpleNamespace(create=self._create))
 
     def add_response(
         self,
@@ -148,32 +148,36 @@ class FakeClaude:
         tokens_out: int = 50,
         stop_reason: str = "end_turn",
     ) -> None:
-        content = []
-        if text:
-            content.append(SimpleNamespace(type="text", text=text))
-        for tool_use in tool_uses or []:
-            content.append(
-                SimpleNamespace(
-                    type="tool_use",
-                    id=tool_use.get("id", "toolu_1"),
-                    name=tool_use["name"],
-                    input=tool_use["input"],
-                )
-            )
-        usage = SimpleNamespace(input_tokens=tokens_in, output_tokens=tokens_out, cache_read_input_tokens=0)
-        self.responses.append(SimpleNamespace(content=content, usage=usage, stop_reason=stop_reason))
+        message: dict = {"role": "assistant", "content": text or None}
+        if tool_uses:
+            message["tool_calls"] = [
+                {
+                    "id": tool_use.get("id", "call_1"),
+                    "type": "function",
+                    "function": {"name": tool_use["name"], "arguments": json.dumps(tool_use["input"])},
+                }
+                for tool_use in tool_uses
+            ]
+        self.responses.append(
+            {
+                "choices": [
+                    {"message": message, "finish_reason": self.FINISH_REASONS.get(stop_reason, stop_reason)}
+                ],
+                "usage": {"prompt_tokens": tokens_in, "completion_tokens": tokens_out},
+            }
+        )
 
-    async def _create(self, **request):
+    async def post(self, request: dict) -> dict:
         self.requests.append(request)
         if not self.responses:
-            raise AssertionError("FakeClaude has no queued response; call add_response first")
+            raise AssertionError("FakeAi has no queued response; call add_response first")
         return self.responses.pop(0)
 
 
 @pytest.fixture
-def fake_claude(monkeypatch) -> FakeClaude:
+def fake_ai(monkeypatch) -> FakeAi:
     import app.llm.client as llm_client
 
-    fake = FakeClaude()
-    monkeypatch.setattr(llm_client, "get_client", lambda: fake)
+    fake = FakeAi()
+    monkeypatch.setattr(llm_client, "post_chat_completion", fake.post)
     return fake

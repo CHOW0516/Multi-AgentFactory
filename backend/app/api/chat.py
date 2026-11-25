@@ -16,7 +16,7 @@ from app.api.dashboard import kpi_tiles
 from app.api.machine_ops import overview
 from app.core.db import session_scope
 from app.core.security import create_access_token, current_user
-from app.llm.client import DailyCostLimitReached, LlmRefused, call_claude
+from app.llm.client import DailyCostLimitReached, LlmRefused, LlmUnavailable, call_ai
 from app.models import Order, OrderLine, ScheduleSlot
 from app.orchestrator.read_models import material_status, schedule_rows
 from app.schemas.api import ChatRequest, OrderLineOut, WhatIfRequest
@@ -168,8 +168,13 @@ async def respond(body, user, app):
         answer = "I couldn't finish the lookup. Please narrow the question."
         try:
             for _ in range(MAX_ROUNDS):
-                reply = await call_claude(
-                    "orchestrator", messages=messages, tools=TOOLS, system=system, order_id=body.order_id
+                reply = await call_ai(
+                    "orchestrator",
+                    "orchestrator",
+                    messages=messages,
+                    tools=TOOLS,
+                    system=system,
+                    order_id=body.order_id,
                 )
                 blocks = [block for block in reply.message.content if block.type == "tool_use"]
                 if not blocks:
@@ -197,6 +202,8 @@ async def respond(body, user, app):
             answer = "The daily chat budget has been reached."
         except LlmRefused:
             answer = "I couldn't answer that request."
+        except LlmUnavailable:
+            answer = "The AI service is not reachable right now. Please try again later."
         history.extend((user_turn, {"role": "assistant", "content": answer}))
     for offset in range(0, len(answer), 256):
         yield answer[offset : offset + 256]

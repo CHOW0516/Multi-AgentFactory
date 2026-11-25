@@ -13,17 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.planning.service import what_if
 from app.api.master_data import commit_or_conflict, create_row, flush_or_conflict, get_or_404
 from app.api.orders import sales_only
-from app.core.security import require_roles
-
-# Managers and admins can view quotations and run the read-only date check; only sales can create or edit.
-quotation_reader = require_roles("sales", "manager", "admin")
 from app.core.audit import write_audit
 from app.core.config import settings
 from app.core.db import get_session
+from app.core.security import require_roles
 from app.models import Customer, Part, Quotation, User
 from app.schemas.api import QuotationIn, QuotationOut, WhatIfRequest, WhatIfResult
 
 router = APIRouter(tags=["quotations"])
+# Managers and admins can view quotations and run the read-only date check; only sales can create or edit.
+quotation_reader = require_roles("sales", "manager", "admin")
 QuoteStatus = Literal["open", "accepted", "expired", "cancelled"]
 
 

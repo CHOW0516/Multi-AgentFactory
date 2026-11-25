@@ -1,15 +1,29 @@
-"""USD per million tokens (input, output). Update when prices change."""
+"""USD per million tokens (input, output), set per model in .env as AI_PRICES.
 
+Example: AI_PRICES={"gemini/gemini-3.8-flash": [0.30, 2.50], "grafilab/glm-5.3-flash": [0.10, 0.40]}
+A model missing from AI_PRICES costs 0, so the daily cost limit only counts models with a price.
+"""
+
+import json
+import logging
 from decimal import Decimal
+from functools import lru_cache
 
-PRICE_PER_MILLION_TOKENS: dict[str, tuple[Decimal, Decimal]] = {
-    "claude-opus-5-5": (Decimal("4.00"), Decimal("20.00")),
-    "claude-sonnet-5-5": (Decimal("2.00"), Decimal("10.00")),
-    "claude-haiku-5-5": (Decimal("0.10"), Decimal("0.50")),
-}
-UNKNOWN_MODEL_PRICE = (Decimal("4.00"), Decimal("20.00"))  # assume the most expensive known tier
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+@lru_cache
+def prices() -> dict[str, tuple[Decimal, Decimal]]:
+    try:
+        raw = json.loads(settings.ai_prices or "{}")
+        return {model: (Decimal(str(pair[0])), Decimal(str(pair[1]))) for model, pair in raw.items()}
+    except (ValueError, TypeError, IndexError, KeyError, AttributeError):
+        logger.warning('AI_PRICES is not valid JSON like {"model": [input, output]}; costs are counted as 0')
+        return {}
 
 
 def cost_usd(model: str, tokens_in: int, tokens_out: int) -> Decimal:
-    input_price, output_price = PRICE_PER_MILLION_TOKENS.get(model, UNKNOWN_MODEL_PRICE)
+    input_price, output_price = prices().get(model, (Decimal(0), Decimal(0)))
     return (Decimal(tokens_in) * input_price + Decimal(tokens_out) * output_price) / Decimal(1_000_000)

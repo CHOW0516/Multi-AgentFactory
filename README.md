@@ -14,7 +14,7 @@ Desktop: Electron, React 18, TypeScript, Vite, TanStack Query, Zustand, Recharts
 ## Quick start
 
 ```bash
-cp .env.example .env            # change every change-me, add ANTHROPIC_API_KEY
+cp .env.example .env            # change every change-me, add AI_API_KEY (Grafilab)
 docker compose up -d postgres rabbitmq greenmail api
 docker compose --profile tools run --rm seed
 cd desktop && npm ci && npm run dev

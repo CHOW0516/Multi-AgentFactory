@@ -29,11 +29,19 @@ class Settings(BaseSettings):
     task_default_timeout_seconds: int = 120
     task_max_attempts: int = 3
 
-    # LLM
-    anthropic_api_key: str = ""
-    llm_model_orchestrator: str = "claude-opus-5-5"
-    llm_model_extraction: str = "claude-sonnet-5-5"
-    llm_model_explain: str = "claude-haiku-5-5"
+    # AI provider (any OpenAI-compatible endpoint; Grafilab by default)
+    ai_base_url: str = "https://llm.grafilab.ai/v1"
+    ai_api_key: str = ""
+    ai_model: str = "grafilab/glm-5.3-flash"  # default for every agent
+    # Per-agent models; empty means use ai_model.
+    ai_model_orchestrator: str = ""
+    ai_model_order: str = ""
+    ai_model_planning: str = ""
+    ai_model_material: str = ""
+    ai_model_quality: str = ""
+    ai_model_maintenance: str = ""
+    ai_model_monitoring: str = ""
+    ai_prices: str = "{}"  # JSON: {"model": [usd per million input tokens, usd per million output tokens]}
     llm_max_tokens: int = 4096
     llm_daily_cost_limit_usd: float = 20.0
 
