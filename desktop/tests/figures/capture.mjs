@@ -78,7 +78,7 @@ try {
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Collapse sidebar" }).click();
   assert(await page.getByRole("navigation", { name: "Main" }).isVisible());
-  assert.equal(await page.getByRole("link", { name: "Agent map" }).getAttribute("title"), "Agent map");
+  assert.equal(await page.getByRole("link", { name: "Agent map" }).getAttribute("data-tooltip"), "Agent map");
   await page.getByRole("button", { name: "Expand sidebar" }).click();
 
   await page.getByRole("link", { name: "Agent map" }).click();
@@ -91,8 +91,8 @@ try {
   await page.keyboard.press("Enter");
   const agent = page.getByRole("dialog", { name: "Planning" });
   await agent.getByText("Last 50 messages").waitFor();
-  await agent.locator("details summary").first().click();
-  assert(await agent.locator("details[open] pre").first().textContent());
+  await agent.locator(".p5-list details summary").first().click();
+  assert(await agent.locator(".p5-list details[open] pre").first().textContent());
   await page.keyboard.press("Escape");
   const rail = page.getByRole("button", { name: "Planning rail" });
   await rail.focus();

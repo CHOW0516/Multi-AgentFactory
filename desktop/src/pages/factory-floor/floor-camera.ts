@@ -21,7 +21,7 @@ export function zoomAt(view: FloorView, ratio: number, [x, y]: Pair = [0, 0]): F
 
 /** Quantise geometry updates during a drag. Zoom and pan only move the SVG group. */
 export function projectionAngles(view: FloorView) {
-  return [wrap(Math.round(view.azimuth / 2) * 2), Math.round(view.elevation / 2) * 2] as const;
+  return [wrap(Math.round(view.azimuth)), Math.round(view.elevation)] as const;
 }
 
 export function floorProjection(azimuth: number, elevation: number): Projection {
@@ -34,4 +34,23 @@ export function locateInView(view: FloorView, point: Point3, camera: Projection,
   const [x, y] = iso(point, camera);
   const zoom = Math.max(1.45, Math.min(view.zoom, 1.85));
   return { ...view, zoom, x: (floorViewport.x - x) * zoom + offset[0], y: (floorViewport.y - y) * zoom + offset[1] };
+}
+
+/** Focus in the clear part of a full-size canvas, without cropping it for a panel. */
+export function inspectorOffset(scene: SVGSVGElement): Pair {
+  const bounds = scene.getBoundingClientRect();
+  const workspace = scene.closest(".floor-workspace");
+  const inspector = workspace?.querySelector(".floor-inspector")?.getBoundingClientRect();
+  if (!inspector || !bounds.width || !bounds.height) return [0, 18];
+  const scale = Math.min(bounds.width / floorViewport.width, bounds.height / floorViewport.height);
+  const centreX = bounds.left + bounds.width / 2;
+  const centreY = bounds.top + bounds.height / 2;
+  // A bottom sheet occupies most of the width; otherwise the panel floats right.
+  if (inspector.width > bounds.width * .65) {
+    const headerBottom = workspace?.querySelector(".floor-overview")?.getBoundingClientRect().bottom ?? bounds.top;
+    const targetY = (Math.max(bounds.top, headerBottom) + inspector.top - 12) / 2;
+    return [0, (targetY - centreY) / scale + floorViewport.height / 2 - floorViewport.y];
+  }
+  const targetX = (bounds.left + inspector.left - 12) / 2;
+  return [(targetX - centreX) / scale, 18];
 }

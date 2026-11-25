@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "../shell/icons";
 import "./components.css";
@@ -30,6 +30,10 @@ export function DatePicker({ id, value, onChange, min, max, "aria-label": label,
   const [focused, setFocused] = useState(() => value || isoDate(new Date()));
   const [month, setMonth] = useState(() => readDate(value) ?? new Date());
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [fieldLabel, setFieldLabel] = useState(label ?? "date");
+  useLayoutEffect(() => {
+    setFieldLabel(label ?? input.current?.labels?.[0]?.textContent?.trim() ?? "date");
+  }, [inputId, label]);
   const today = isoDate(new Date());
   const valid = (day: string) => Boolean(readDate(day)) && (!min || day >= min) && (!max || day <= max);
 
@@ -114,7 +118,7 @@ export function DatePicker({ id, value, onChange, min, max, "aria-label": label,
       }}
       onKeyDown={(event) => { if (event.key === "ArrowDown") { event.preventDefault(); show(); } }} />
     <button className="icon-button date-picker-trigger" type="button" disabled={disabled}
-      aria-label={`Choose ${label ?? input.current?.labels?.[0]?.textContent?.trim() ?? "date"}`} aria-haspopup="dialog" aria-expanded={open}
+      aria-label={`Choose ${fieldLabel}`} aria-haspopup="dialog" aria-expanded={open}
       onClick={() => open ? setOpen(false) : show()}><Icon name="schedule" size={16} /></button>
     {open && createPortal(<div ref={popup} id={popupId} role="dialog" aria-label="Choose date" className="date-calendar"
       style={position}>

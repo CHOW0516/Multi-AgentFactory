@@ -103,6 +103,7 @@ describe("factory floor", () => {
   it("orbits and zooms independently and can reset the camera", async () => {
     render(provide(<FactoryFloor />));
     const scene = await screen.findByRole("group", { name: /interactive isometric factory floor/i });
+    expect(fireEvent.contextMenu(scene)).toBe(false);
     const startingAngle = scene.getAttribute("data-azimuth");
     fireEvent.click(screen.getByRole("button", { name: "Rotate left" }));
     await waitFor(() => expect(scene).not.toHaveAttribute("data-azimuth", startingAngle));

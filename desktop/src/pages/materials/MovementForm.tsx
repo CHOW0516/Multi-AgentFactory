@@ -1,3 +1,4 @@
+import { Select } from "../../components/Select";
 // Store form for receive / issue / scrap / return / adjust. A barcode scanner works as keyboard
 // input: it types the code into the material field and presses Enter, which moves to quantity.
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -54,9 +55,9 @@ export function MovementForm({ materials, presetCode, onDone }: { materials: Mat
       <div className="grid-2">
         <div className="field">
           <label htmlFor="movement-type">Type</label>
-          <select id="movement-type" value={draft.movementType} onChange={(event) => update({ movementType: event.target.value as MovementType })}>
+          <Select id="movement-type" value={draft.movementType} onChange={(event) => update({ movementType: event.target.value as MovementType })}>
             {(Object.keys(MOVEMENT_LABELS) as MovementType[]).map((type) => <option key={type} value={type}>{MOVEMENT_LABELS[type]}</option>)}
-          </select>
+          </Select>
         </div>
         <div className="field">
           <label htmlFor="movement-quantity">Quantity{material ? ` (${material.unit})` : ""}</label>

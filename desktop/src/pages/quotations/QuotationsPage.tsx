@@ -1,3 +1,4 @@
+import { Select } from "../../components/Select";
 import { DatePicker } from "../../components/DatePicker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
@@ -46,10 +47,10 @@ export function QuotationsPage() {
       <div className="filter-bar">
         <div className="field">
           <label htmlFor="quote-status">Status</label>
-          <select id="quote-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <Select id="quote-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="">All</option><option value="open">Open</option><option value="accepted">Accepted</option>
             <option value="expired">Expired</option><option value="cancelled">Cancelled</option>
-          </select>
+          </Select>
         </div>
       </div>
       <DataTable columns={columns} rows={rows} rowKey={(quotation) => quotation.id} isLoading={quotationsQuery.isPending}
@@ -130,17 +131,17 @@ function QuotationForm({ quotation, customers, parts, onDone }: {
     <form onSubmit={submit} aria-label="Quotation" noValidate>
       <div className="field">
         <label htmlFor="quote-customer">Customer</label>
-        <select id="quote-customer" value={customerId} onChange={(event) => { setCustomerId(event.target.value); setPartId(""); }}>
+        <Select id="quote-customer" value={customerId} onChange={(event) => { setCustomerId(event.target.value); setPartId(""); }}>
           <option value="">Choose…</option>
           {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
-        </select>
+        </Select>
       </div>
       <div className="field">
         <label htmlFor="quote-part">Part</label>
-        <select id="quote-part" value={partId} onChange={(event) => setPartId(event.target.value)}>
+        <Select id="quote-part" value={partId} onChange={(event) => setPartId(event.target.value)}>
           <option value="">Choose…</option>
           {customerParts.map((part) => <option key={part.id} value={part.id}>{part.part_number} rev {part.revision} · {part.description}</option>)}
-        </select>
+        </Select>
       </div>
       <div className="grid-3">
         <div className="field"><label htmlFor="quote-quantity">Quantity</label>

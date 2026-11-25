@@ -1,3 +1,4 @@
+import { Select } from "../../components/Select";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { apiFetch, USE_MOCKS, useLiveEvents } from "../../api/client";
@@ -148,7 +149,7 @@ export function AgentMap() {
     </header>
     <div className="floor-guide floor-panel">
       <div className="floor-guide-title"><Icon name="orbit" size={17} />
-        <span className="floor-pointer-hint">Drag to orbit · Shift + drag to pan · Scroll to zoom</span>
+        <span className="floor-pointer-hint">Drag to orbit · Right-drag to pan · Scroll to zoom</span>
         <span className="floor-touch-hint">Drag to orbit · Pinch to zoom</span>
       </div>
       <div className="floor-legend">{["task", "result", "event", "failed"].map((kind) =>
@@ -172,19 +173,19 @@ export function AgentMap() {
     <details className="agent-replay floor-panel"><summary><Icon name="history" size={16} />Order replay <Icon name="chevron-down" size={14} /></summary>
     <section aria-label="Order replay" className="p5-replay">
       <div className="p5-replay-field"><label htmlFor={orderControl}>Order replay</label>
-        <select id={orderControl} value={order} onChange={(event) => { setPlaying(false); seek(0); setOrder(event.target.value); }}>
+        <Select id={orderControl} value={order} onChange={(event) => { setPlaying(false); seek(0); setOrder(event.target.value); }}>
           <option value="">Live traffic</option>
           {orders.data?.map((entry) => <option key={entry.id} value={entry.id}>{entry.order_number}</option>)}
-        </select>
+        </Select>
       </div>
       <button className="button" type="button" disabled={!order || !plan.end} onClick={() => {
         if (!playing && position.current >= plan.end) seek(0);
         setPlaying(!playing);
       }}>{playing ? "Pause" : "Play"}</button>
       <div className="p5-replay-field"><label htmlFor={speedControl}>Speed</label>
-        <select id={speedControl} value={speed} onChange={(event) => setSpeed(event.target.value === "4" ? 4 : 1)}>
+        <Select id={speedControl} value={speed} onChange={(event) => setSpeed(event.target.value === "4" ? 4 : 1)}>
           <option value="1">1×</option><option value="4">4×</option>
-        </select>
+        </Select>
       </div>
       <label className="p5-scrubber">Replay time
         <input key={order} ref={slider} type="range" min="0" max={plan.end || 1} step="1" defaultValue="0"

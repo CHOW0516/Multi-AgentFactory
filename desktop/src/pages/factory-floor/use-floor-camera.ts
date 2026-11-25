@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject } from "react";
 import { floorViewport, initialView, orbit, zoomAt, type FloorView } from "./floor-camera";
 
 type Pair = [number, number];
@@ -7,6 +7,7 @@ type Gesture = {
   centre: Pair;
   distance: number;
   pan: boolean;
+  bounds: DOMRect;
 };
 
 function midpoint(points: Pair[]): Pair {
@@ -33,6 +34,7 @@ function fromViewCentre(point: Pair, box: DOMRect): Pair {
 export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
   const [view, setView] = useState(initialView);
   const [moving, setMoving] = useState(false);
+  const [turning, setTurning] = useState(false);
   const latest = useRef(view);
   const destination = useRef<FloorView | null>(null);
   const points = useRef(new Map<number, Pair>());
@@ -45,6 +47,7 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
     cancelAnimationFrame(tween.current);
     tween.current = 0;
     destination.current = null;
+    setTurning(false);
   }
 
   function change(next: FloorView, dragging = false) {
@@ -73,6 +76,7 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
     destination.current = next;
     const from = latest.current;
     const yaw = ((next.azimuth - from.azimuth + 540) % 360) - 180;
+    setTurning(yaw !== 0 || next.elevation !== from.elevation);
     let start: number | undefined;
     function tick(now: number) {
       start ??= now;
@@ -113,18 +117,19 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
 
   function start(pan: boolean) {
     const active = [...points.current.values()];
-    gesture.current = active.length ? { view: latest.current, centre: midpoint(active), distance: separation(active), pan } : null;
+    const bounds = scene.current?.getBoundingClientRect();
+    gesture.current = active.length && bounds ? { view: latest.current, centre: midpoint(active), distance: separation(active), pan, bounds } : null;
   }
 
   function onPointerDown(event: PointerEvent<SVGSVGElement>) {
-    if (event.button !== 0 && event.button !== 1) return;
-    if (event.button === 1) event.preventDefault();
+    if (event.button !== 0 && event.button !== 1 && event.button !== 2) return;
+    if (event.button !== 0) event.preventDefault();
     if (!points.current.size) {
       moved.current = false;
       stopTransition();
     }
     points.current.set(event.pointerId, [event.clientX, event.clientY]);
-    if (points.current.size <= 2) start(event.shiftKey || event.button === 1);
+    if (points.current.size <= 2) start(event.button === 1 || event.button === 2);
   }
 
   function onPointerMove(event: PointerEvent<SVGSVGElement>) {
@@ -133,7 +138,7 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
     const active = [...points.current.values()].slice(0, 2);
     const centre = midpoint(active);
     const { x, y } = gesture.current.view;
-    const box = event.currentTarget.getBoundingClientRect();
+    const box = gesture.current.bounds;
     const dx = centre[0] - gesture.current.centre[0];
     const dy = centre[1] - gesture.current.centre[1];
     if (!moved.current && Math.hypot(dx, dy) < 5 && active.length < 2) return;
@@ -154,7 +159,12 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
 
   function onPointerEnd(event: PointerEvent<SVGSVGElement>) {
     if (!points.current.delete(event.pointerId)) return;
-    if (!points.current.size) setMoving(false);
+    if (!points.current.size) {
+      cancelAnimationFrame(frame.current);
+      frame.current = 0;
+      setView(latest.current);
+      setMoving(false);
+    }
     start(gesture.current?.pan ?? false);
   }
 
@@ -177,11 +187,12 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
   }
 
   return {
-    view, moving, animate, moved,
+    view, moving, lowDetail: moving || turning, animate, moved,
     reset: () => animate(initialView),
     turn: (amount: number) => animate(orbit(destination.current ?? latest.current, amount)),
     zoom: (amount: number) => animate(zoomAt(destination.current ?? latest.current, amount)),
     handlers: { onPointerDown, onPointerMove, onPointerUp: onPointerEnd, onPointerCancel: onPointerEnd,
+      onContextMenu: (event: MouseEvent<SVGSVGElement>) => event.preventDefault(),
       onLostPointerCapture: (event: PointerEvent<SVGSVGElement>) => {
         if (event.target === event.currentTarget) onPointerEnd(event);
       }, onPointerLeave: (event: PointerEvent<SVGSVGElement>) => {

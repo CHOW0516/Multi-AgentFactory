@@ -38,7 +38,7 @@ export function ApprovalsPage() {
     { key: "waiting", header: "Waiting", render: (approval) => (
       <span className="row">
         {timeSince(approval.waiting_since)}
-        {approval.reminded && approval.status === "waiting" ? <span className="badge badge-problem" title="A reminder was sent">Reminder sent</span> : null}
+        {approval.reminded && approval.status === "waiting" ? <span className="badge badge-problem" data-tooltip="A reminder was sent">Reminder sent</span> : null}
       </span>
     ) },
   ];

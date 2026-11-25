@@ -5,7 +5,7 @@ import { compareDepth } from "../../figures/geometry";
 import { useFigureFrames, useMotionVisibility } from "../../figures/motion";
 import { activateOnKey } from "../../figures/figure-ui";
 import { CameraControls } from "../../figures/CameraControls";
-import { floorProjection, floorViewport, locateInView, projectionAngles } from "../factory-floor/floor-camera";
+import { floorProjection, floorViewport, inspectorOffset, locateInView, projectionAngles } from "../factory-floor/floor-camera";
 import { useFloorCamera } from "../factory-floor/use-floor-camera";
 import { iso } from "../../iso/iso-kit";
 import type { Selection } from "./model";
@@ -61,6 +61,7 @@ const StationUnit = memo(function StationUnit({ name, stats, failed, active, onI
   const show = () => onInspect(name);
   const counter = stats ? `${stats.queue_depth} | ${stats.in_progress}` : "— | —";
   return <g transform={item.transform} className="p5-scene-target p5-station" data-station={name} data-testid={`agent-node-${name}`}
+    data-tooltip={`${item.label} · ${stats?.queue_depth ?? "Unknown"} in queue · ${stats?.in_progress ?? "Unknown"} in progress`}
     data-active={selected || undefined} aria-pressed={selected} data-failed={failed || undefined} data-working={active || undefined} role="button" tabIndex={0}
     aria-label={`${item.label} station`} onClick={show} onKeyDown={(event) => activateOnKey(event, show)}
     onPointerEnter={() => onHover(name)} onPointerLeave={() => onHover(null)} onFocus={() => onHover(name)} onBlur={() => onHover(null)}>
@@ -72,7 +73,6 @@ const StationUnit = memo(function StationUnit({ name, stats, failed, active, onI
       <rect className="p5-station-plate" x="77" width="31" height="11" rx="1.3" />
       <text className="p5-display-text" x="80" y="7.5" fontSize={Math.min(6.4, 40 / counter.length)}>{counter}</text>
     </g>
-    <title>{item.label} · {stats?.queue_depth ?? "Unknown"} in queue · {stats?.in_progress ?? "Unknown"} in progress</title>
   </g>;
 });
 
@@ -92,13 +92,13 @@ export function MapScene({ names, summaries, live, replay, onStation, onRail, fo
   const { view } = controls;
   const [azimuth, elevation] = projectionAngles(view);
   const camera = useMemo(() => floorProjection(azimuth, elevation), [azimuth, elevation]);
-  const art = useMemo(() => createMapArt(camera), [camera]);
+  const art = useMemo(() => createMapArt(camera, controls.lowDetail ? "motion" : "full"), [camera, controls.lowDetail]);
   const { stationArt, railArt } = art;
   const lastFocus = useRef<Selection | null>(null);
   useEffect(() => {
-    if (!focus || focus === lastFocus.current) return;
+    if (!focus || focus === lastFocus.current || !scene.current) return;
     lastFocus.current = focus;
-    controls.animate(locateInView(view, stationArt[focus.name].depthPoint, camera, [0, 18]));
+    controls.animate(locateInView(view, stationArt[focus.name].depthPoint, camera, inspectorOffset(scene.current)));
   }, [focus, controls, view, stationArt, camera]);
   const parcels = useRef<SVGPathElement[]>([]);
   const liveClock = useRef(0);
@@ -191,8 +191,9 @@ export function MapScene({ names, summaries, live, replay, onStation, onRail, fo
   const selectedStation = selection && stationArt[selection.name];
   const marker = selectedStation && iso([selectedStation.depthPoint[0], selectedStation.depthPoint[1], 100], camera);
   return <>
-    <span className="sr-only" id={hint}>Drag to orbit. Shift and drag or middle-drag to pan. Scroll or pinch to zoom. Use arrows, plus, minus and Home on the keyboard.</span>
+    <span className="sr-only" id={hint}>Drag to orbit. Hold right click and drag to pan. Scroll or pinch to zoom. Use arrows, plus, minus and Home on the keyboard.</span>
     <div className="floor-viewport" data-moving={controls.moving || undefined}><svg ref={scene} className="iso-svg p5-scene floor-model"
+    data-detail={controls.lowDetail ? "motion" : "full"}
     data-azimuth={azimuth} data-elevation={elevation} data-zoom={view.zoom.toFixed(2)}
     viewBox={`0 0 ${floorViewport.width} ${floorViewport.height}`} aria-label="Interactive isometric agent control room" role="group" tabIndex={0}
     aria-describedby={hint} {...controls.handlers} onClickCapture={(event) => {

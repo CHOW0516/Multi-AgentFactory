@@ -1,3 +1,4 @@
+import { Select } from "../../components/Select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 import { apiFetch } from "../../api/client";
@@ -80,9 +81,9 @@ export function MachineDrawer({ machine, onClose, onLocate }: { machine: FloorMa
       {saved && <p className="p5-notice" role="status">Machine updated.</p>}
       {action && <form className="p5-edit" onSubmit={submit}>
         {action === "status" ? <div className="p5-replay-field"><label htmlFor={statusId}>Status</label>
-          <select id={statusId} value={status} onChange={(event) => setStatus(event.target.value as MachineStatus)}>
+          <Select id={statusId} value={status} onChange={(event) => setStatus(event.target.value as MachineStatus)}>
             {Object.entries(statusNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select></div> : <>
+          </Select></div> : <>
           <label>Breakdown note<textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} /></label>
           <label>Estimated downtime (hours)<input type="number" min="0.25" step="0.25" value={hours} onChange={(event) => setHours(event.target.value)} /></label>
         </>}

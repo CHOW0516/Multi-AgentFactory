@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import { HashRouter } from "react-router-dom";
 import { queryClient } from "./api/client";
 import { App } from "./App";
+import { TooltipLayer } from "./components/TooltipLayer";
 import "./theme/global.css";
 import { initTheme } from "./theme/theme-store";
 
@@ -14,6 +15,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <QueryClientProvider client={queryClient}>
       <HashRouter>
         <App />
+        <TooltipLayer />
       </HashRouter>
     </QueryClientProvider>
   </React.StrictMode>,

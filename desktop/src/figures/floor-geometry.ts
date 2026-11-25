@@ -1,6 +1,6 @@
 import type { FloorMachine } from "../api/types";
 import { depthOf, lineSvg, onTop, sideMatrix, topMatrix, towardViewer, type Point3, type Projection } from "../iso/iso-kit";
-import { buildWith, group, outlineRect, panelScrews, slots, track } from "./geometry";
+import { buildWith, group, outlineRect, panelScrews, slots, track, type GeometryDetail } from "./geometry";
 
 export type MachineKind = "cnc_lathe" | "cnc_mill" | "laser_cutter" | "press_brake" | "qc_station" | "packing";
 
@@ -9,10 +9,10 @@ export function kindFor(type: string): MachineKind | undefined {
   return machineKinds.has(type) ? type as MachineKind : undefined;
 }
 
-export function floorArt(camera: Projection) {
-  const floor = buildWith(camera);
+export function floorArt(camera: Projection, detail: GeometryDetail = "full") {
+  const floor = buildWith(camera, detail);
   const localCamera: Projection = { ...camera, origin: [0, 0] };
-  const local = buildWith(localCamera);
+  const local = buildWith(localCamera, detail);
   const [viewX, viewY] = towardViewer(camera);
   const showFront = viewY > .008;
   const { block, front, legs, bolts } = local;

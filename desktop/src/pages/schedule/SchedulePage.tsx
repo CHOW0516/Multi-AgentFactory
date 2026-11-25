@@ -1,3 +1,4 @@
+import { Select } from "../../components/Select";
 import { DatePicker } from "../../components/DatePicker";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -94,29 +95,29 @@ export function SchedulePage() {
       <div className="schedule-toolbar">
         <div className="schedule-day-controls" role="group" aria-label="Schedule date">
           <div className="schedule-arrows">
-            <button type="button" className="icon-button" aria-label="Previous day" title="Previous day" onClick={() => selectDay(addDays(date, -1))}>
+            <button type="button" className="icon-button" aria-label="Previous day" data-tooltip="Previous day" onClick={() => selectDay(addDays(date, -1))}>
               <Icon name="chevron-left" size={17} />
             </button>
-            <button type="button" className="icon-button" aria-label="Next day" title="Next day" onClick={() => selectDay(addDays(date, 1))}>
+            <button type="button" className="icon-button" aria-label="Next day" data-tooltip="Next day" onClick={() => selectDay(addDays(date, 1))}>
               <Icon name="chevron-right" size={17} />
             </button>
           </div>
           <div className="schedule-date">
             <DatePicker aria-label="Date" value={date} required onChange={selectDay} />
           </div>
-          <button className="button" type="button" title="Go to today and the current time" onClick={() => {
+          <button className="button" type="button" data-tooltip="Go to today and the current time" onClick={() => {
             setPicked(null);
             setJump((value) => value + 1);
             close();
           }}>Today</button>
         </div>
         <div className="schedule-toolbar-end">
-          <span className="schedule-zone" title={timeZone}><Icon name="clock" size={15} />{timeZone.replaceAll("_", " ").split("/").at(-1)}</span>
+          <span className="schedule-zone" data-tooltip={timeZone}><Icon name="clock" size={15} />{timeZone.replaceAll("_", " ").split("/").at(-1)}</span>
           <label className="schedule-filter"><span className="sr-only">Machine type</span>
-            <select value={machineType} onChange={(event) => { setMachineType(event.target.value); close(); }}>
+            <Select value={machineType} onChange={(event) => { setMachineType(event.target.value); close(); }}>
               <option value="">All machine types</option>
               {machineTypes.map((type) => <option key={type} value={type}>{nameLabel(type)}</option>)}
-            </select>
+            </Select>
           </label>
         </div>
       </div>

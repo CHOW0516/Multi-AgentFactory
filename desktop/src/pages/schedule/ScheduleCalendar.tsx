@@ -17,7 +17,7 @@ function BookingCard({ block, start, time, machine, onSelect }: {
   return <button type="button" className="schedule-booking" data-tone={booking.tone} data-compact={compact || undefined}
     data-short={height < 32 || undefined}
     aria-label={`${booking.title}, ${label}, ${machine.code}, ${from} to ${to}`}
-    title={`${booking.title} · ${label} · ${from} – ${to}`} onClick={onSelect}
+    data-tooltip={`${booking.title} · ${label} · ${from} – ${to}`} onClick={onSelect}
     style={{
       top: (block.start - start) / hour * hourHeight,
       height,

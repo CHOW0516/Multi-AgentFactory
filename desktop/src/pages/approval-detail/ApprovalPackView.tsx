@@ -85,7 +85,7 @@ export function ApprovalPackView({ pack, machines, userName, handlers }: {
             <tbody>
               {pack.material.needs.map((need) => (
                 <tr key={need.material_id}>
-                  <td title={need.material_name}>{need.material_code}</td>
+                  <td data-tooltip={need.material_name}>{need.material_code}</td>
                   <td className="align-right">{formatNumber(need.needed)} {need.unit}</td>
                   <td className="align-right">{formatNumber(need.available)}</td>
                   <td className="align-right">{formatNumber(need.held)}</td>

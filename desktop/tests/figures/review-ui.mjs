@@ -11,16 +11,19 @@ async function inspect(floor){
  await page.getByRole('button',{name:floor?/^CNC Lathe 1,/: 'Planning station'}).focus();await page.keyboard.press('Enter');
  const drawer=page.getByRole('dialog',{name:floor?'CNC Lathe 1':'Planning',exact:true});await expect(drawer).toBeVisible();
  await expect(page.locator('.floor-workspace')).toHaveAttribute('data-inspecting','true');await expect(page.locator('.floor-model')).toHaveAttribute('data-zoom','1.45');await page.waitForTimeout(260);
- const s=await page.locator('.floor-viewport').boundingBox(),p=await drawer.boundingBox();assert(s.x+s.width<=p.x+1||s.y+s.height<=p.y+1,'Inspector overlaps scene '+JSON.stringify({s,p,floor,width:page.viewportSize().width}));
+ const s=await page.locator('.floor-viewport').boundingBox(),p=await drawer.boundingBox(),workspace=await page.locator('.floor-workspace').boundingBox();
+ assert(Math.abs(s.width-workspace.width)<1&&Math.abs(s.height-workspace.height)<1,'Floating inspector must not crop any part of the canvas');
+ const marker=await page.locator('.floor-marker').boundingBox();assert(marker&&(marker.x+marker.width<p.x||marker.y+marker.height<p.y),'Focused item should stay clear of the floating panel');
  const angle=await page.locator('.floor-model').getAttribute('data-azimuth');await page.getByRole('button',{name:'Rotate right',exact:true}).click();
  await expect(page.locator('.floor-model')).not.toHaveAttribute('data-azimuth',angle);
+ await expect(page.locator('.floor-model')).toHaveAttribute('data-detail','full');
  await drawer.getByRole('button',{name:floor?'Focus machine':'Focus agent'}).click();await page.waitForTimeout(260);
  await shot((floor?'floor':'agents')+'-inspector-'+page.viewportSize().width);
  await page.keyboard.press('Escape');await expect(drawer).toHaveCount(0);
  await page.getByRole('button',{name:'Reset camera',exact:true}).click();await expect(page.locator('.floor-model')).toHaveAttribute('data-zoom','1.00');
- const b=await page.locator('.floor-model').boundingBox(),before=await page.locator('.floor-model > g').getAttribute('transform');
- await page.keyboard.down('Shift');await page.mouse.move(b.x+b.width*.4,b.y+b.height*.55);await page.mouse.down();await page.mouse.move(b.x+b.width*.4+45,b.y+b.height*.55+25,{steps:8});await page.mouse.up();await page.keyboard.up('Shift');
- await expect(page.getByRole('dialog')).toHaveCount(0);assert.notEqual(await page.locator('.floor-model > g').getAttribute('transform'),before);
+ const b=await page.locator('.floor-model').boundingBox(),before=await page.locator('.floor-model > g').getAttribute('transform'),panAngle=await page.locator('.floor-model').getAttribute('data-azimuth');
+ await page.mouse.move(b.x+b.width*.4,b.y+b.height*.55);await page.mouse.down({button:'right'});await page.mouse.move(b.x+b.width*.4+45,b.y+b.height*.55+25,{steps:8});await expect(page.locator('.floor-model')).toHaveAttribute('data-detail','motion');await page.mouse.up({button:'right'});await expect(page.locator('.floor-model')).toHaveAttribute('data-detail','full');
+ await expect(page.getByRole('dialog')).toHaveCount(0);assert.notEqual(await page.locator('.floor-model > g').getAttribute('transform'),before);assert.equal(await page.locator('.floor-model').getAttribute('data-azimuth'),panAngle);assert(await page.locator('.floor-model').evaluate(el=>!el.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}))));
 }
 try{
  await page.goto(process.env.P5_URL??'http://127.0.0.1:5173');await page.getByLabel('Email').fill('manager@factory.local');await page.getByLabel('Password').fill('demo');await page.getByRole('button',{name:'Log in',exact:true}).click();

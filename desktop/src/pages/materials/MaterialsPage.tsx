@@ -1,3 +1,4 @@
+import { Select } from "../../components/Select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -38,7 +39,7 @@ export function MaterialsPage() {
     { key: "counted", header: "Last counted", render: (material) => (material.last_counted_at ? `${timeSince(material.last_counted_at)} ago` : "Never"),
       sortValue: (material) => material.last_counted_at ?? "" },
     { key: "warnings", header: "", render: (material) => (material.warnings.length > 0
-      ? <span className="mismatch" title={material.warnings.join(". ")} aria-label={material.warnings.join(". ")}>⚠ {material.warnings.length}</span> : null) },
+      ? <span className="mismatch" data-tooltip={material.warnings.join(". ")} aria-label={material.warnings.join(". ")}>⚠ {material.warnings.length}</span> : null) },
   ];
 
   return (
@@ -145,14 +146,14 @@ function CycleCountTab({ materials }: { materials: MaterialOut[] }) {
     <form className="card compact" style={{ maxWidth: 520 }} onSubmit={submit} aria-label="Cycle count" noValidate>
       <div className="field">
         <label htmlFor="count-material">Material (oldest count first)</label>
-        <select id="count-material" value={materialId} onChange={(event) => setMaterialId(event.target.value)}>
+        <Select id="count-material" value={materialId} onChange={(event) => setMaterialId(event.target.value)}>
           <option value="">Choose…</option>
           {byOldestCount.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>
               {candidate.code} · counted {candidate.last_counted_at ? `${timeSince(candidate.last_counted_at)} ago` : "never"}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       <div className="field">
         <label htmlFor="count-quantity">Counted quantity{material ? ` (${material.unit})` : ""}</label>

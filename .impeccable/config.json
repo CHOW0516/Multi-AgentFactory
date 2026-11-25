@@ -11,6 +11,15 @@
         ],
         "createdAt": "2026-11-25T15:48:06.837Z",
         "reason": "Agent review: all three findings exist unchanged in Git HEAD. Two stripes identify warning/action table rows; the neutral timeline border connects chronological events. These are semantic status/navigation cues, not decorative card accents."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "desktop/src/pages/schedule/schedule.css"
+        ],
+        "createdAt": "2026-11-25T23:20:29.266Z",
+        "reason": "Agent review: this booking edge exists unchanged in Git HEAD and encodes the status colors used by the schedule legend (locked, tentative, done, maintenance and breakdown). The user named Schedule as the incumbent visual reference; this is a functional calendar status cue, not a decorative card accent."
       }
     ]
   }

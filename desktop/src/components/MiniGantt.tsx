@@ -53,9 +53,9 @@ export function MiniGantt({ lanes, bars, from, to, showToday = true, ariaLabel =
               const title = `${bar.label}: ${formatDateTime(bar.start)} – ${formatDateTime(bar.end)}`;
               return bar.onClick ? (
                 <button type="button" key={bar.id} className={`gantt-bar gantt-${bar.tone}`} style={style}
-                  title={title} aria-label={title} onClick={bar.onClick}>{bar.label}</button>
+                  data-tooltip={title} aria-label={title} onClick={bar.onClick}>{bar.label}</button>
               ) : (
-                <span key={bar.id} className={`gantt-bar gantt-${bar.tone}`} style={style} title={title}>{bar.label}</span>
+                <span key={bar.id} className={`gantt-bar gantt-${bar.tone}`} style={style} data-tooltip={title}>{bar.label}</span>
               );
             })}
             {showToday && now > start && now < end ? (

@@ -55,7 +55,6 @@
   --schedule-rule: var(--color-border);
   flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
   border-top: 1px solid var(--schedule-rule); background: var(--color-surface);
-  scrollbar-color: color-mix(in srgb, var(--color-text-muted) 47%, var(--color-border)) var(--color-surface-muted);
   scrollbar-width: thin;
 }
 .schedule-calendar:focus-visible { outline-offset: -3px; }

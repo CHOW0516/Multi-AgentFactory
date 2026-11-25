@@ -34,7 +34,7 @@ export function Layout({ routes, children }: { routes: PageRoute[]; children: Re
       <header className="shell-topbar">
         <button className="icon-button shell-sidebar-toggle" type="button" onClick={() => setSidebarOpen(!sidebarOpen)}
           aria-expanded={sidebarOpen} aria-controls="workspace-navigation"
-          aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"} title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}>
+          aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"} data-tooltip={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}>
           <Icon name="sidebar" size={19} />
         </button>
         <div className="shell-brand"><span className="shell-brand-icon"><Icon name="factory" size={19} /></span>Factory Commit</div>
@@ -47,7 +47,7 @@ export function Layout({ routes, children }: { routes: PageRoute[]; children: Re
         <div className="shell-user"><span className="shell-avatar" aria-hidden="true">{initials}</span>
           <span><strong>{user?.name}</strong><small>{user?.role}</small></span>
         </div>
-        <button className="icon-button" type="button" onClick={logout} aria-label="Log out" title="Log out">
+        <button className="icon-button" type="button" onClick={logout} aria-label="Log out" data-tooltip="Log out">
           <Icon name="logout" />
         </button>
       </header>
@@ -62,7 +62,7 @@ export function Layout({ routes, children }: { routes: PageRoute[]; children: Re
         <nav className="shell-nav" aria-label="Main">
           {visibleRoutes.map((route) => (
             <NavLink key={route.path} to={route.path} end={route.path === "/"}
-              title={sidebarOpen ? undefined : route.label} aria-label={route.label} onClick={() => {
+              data-tooltip={sidebarOpen ? undefined : route.label} aria-label={route.label} onClick={() => {
               if (window.matchMedia?.("(max-width: 760px)")?.matches) setSidebarOpen(false);
             }}>
               <Icon name={route.icon} /><span>{route.label}</span>

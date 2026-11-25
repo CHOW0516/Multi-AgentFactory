@@ -1,3 +1,4 @@
+import { Select } from "../../components/Select";
 import { DatePicker } from "../../components/DatePicker";
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
@@ -77,9 +78,9 @@ export function HistoryPage() {
         <div className="field"><label htmlFor="history-actor">User or agent</label>
           <input id="history-actor" placeholder="e.g. planning" value={filters.actor} onChange={(event) => update({ actor: event.target.value })} /></div>
         <div className="field"><label htmlFor="history-entity">Record type</label>
-          <select id="history-entity" value={filters.entity} onChange={(event) => update({ entity: event.target.value })}>
+          <Select id="history-entity" value={filters.entity} onChange={(event) => update({ entity: event.target.value })}>
             <option value="">All</option>{["order", "approval", "material", "quotation", "machine", "user", "setting"].map((entity) => <option key={entity} value={entity}>{entity}</option>)}
-          </select></div>
+          </Select></div>
         <div className="field"><label htmlFor="history-from">From</label>
           <DatePicker id="history-from" value={filters.from} max={filters.to || undefined} onChange={(from) => update({ from })} /></div>
         <div className="field"><label htmlFor="history-to">To</label>

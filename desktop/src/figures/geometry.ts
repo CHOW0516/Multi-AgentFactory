@@ -12,11 +12,17 @@ export function roomCamera(width: number, depth: number, height: number) {
   return { ...camera, origin: [camera.origin[0], camera.origin[1] - 46] as Flat };
 }
 
-export function buildWith(camera: Projection) {
+export type GeometryDetail = "full" | "motion";
+
+export function buildWith(camera: Projection, detail: GeometryDetail = "full") {
   function block(x: number, y: number, z: number, width: number, depth: number, height: number,
     ink: Ink = "enamel", tone: Tone = "mid", radius = 2, halo = false) {
-    const solid = slabOf({ x, y, w: width, d: depth, r: radius }, z, height, camera, 3, Math.min(.9, height / 4));
-    return solidSvg(solid, { className: `p5-ink p5-${ink}`, tone, halo });
+    // During orbit, keep the same solid volumes but omit tiny fittings and bevels.
+    // Shorter paths reduce both geometry work and browser SVG tessellation.
+    const motion = detail === "motion";
+    if (motion && (Math.max(width, depth, height) < 10 || height < 1)) return "";
+    const solid = slabOf({ x, y, w: width, d: depth, r: motion ? 0 : radius }, z, height, camera, motion ? 0 : 3, motion ? 0 : Math.min(.9, height / 4));
+    return solidSvg(solid, { className: `p5-ink p5-${ink}`, tone, halo: halo && !motion, crease: motion ? "none" : "faint" });
   }
 
   const at = (point: Point3) => iso(point, camera);
@@ -33,7 +39,7 @@ export function buildWith(camera: Projection) {
       [from[0] + offsetX, from[1] + offsetY], [from[0] - offsetX, from[1] - offsetY],
       [to[0] - offsetX, to[1] - offsetY], [to[0] + offsetX, to[1] + offsetY],
     ];
-    return solidSvg(extrude(plan, z, height, camera, { convex: true }), { className: `p5-ink p5-${ink}`, tone: "lo" });
+    return solidSvg(extrude(plan, z, height, camera, { convex: true }), { className: `p5-ink p5-${ink}`, tone: "lo", crease: detail === "motion" ? "none" : "faint" });
   }
 
   function legs(x: number, y: number, w: number, d: number, height: number, width = 6, z = 0) {

@@ -13,6 +13,7 @@
   --color-overlay: #fbfdfff5;
   --color-danger: #c4382f;
   --color-focus: #2558d4;
+  --scrollbar-thumb: #7186a6;
   --status-running: #2e9d57;
   --status-idle: #8b9097;
   --status-setup: #d39a1c;
@@ -34,6 +35,7 @@
   --color-overlay: #1a283ef5;
   --color-danger: #ef6b62;
   --color-focus: #7d9cf0;
+  --scrollbar-thumb: #637c9f;
   --status-running: #4cc27a;
   --status-idle: #8d939a;
   --status-setup: #e6b440;

@@ -120,7 +120,7 @@ export function FactoryFloor() {
     {floor.data && <div className="floor-guide floor-panel">
       <div className="floor-guide-title">
         <Icon name="orbit" size={17} />
-        <span className="floor-pointer-hint">Drag to orbit <span>·</span> Shift + drag to pan <span>·</span> Scroll to zoom</span>
+        <span className="floor-pointer-hint">Drag to orbit <span>·</span> Right-drag to pan <span>·</span> Scroll to zoom</span>
         <span className="floor-touch-hint">Drag to orbit <span>·</span> Pinch to zoom</span>
       </div>
       <div className="floor-legend" aria-label="Machine status legend">

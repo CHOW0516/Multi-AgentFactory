@@ -1,4 +1,6 @@
+import { Select } from "../../components/Select";
 import { DatePicker } from "../../components/DatePicker";
+import { TimePicker } from "../../components/TimePicker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { apiFetch } from "../../api/client";
@@ -68,17 +70,17 @@ function UsersTab() {
     { key: "name", header: "Name", render: (user) => user.name, sortValue: (user) => user.name },
     { key: "email", header: "Email", render: (user) => user.email },
     { key: "role", header: "Role", render: (user) => (
-      <select aria-label={`Role of ${user.name}`} className="inline-input" value={user.role}
+      <Select aria-label={`Role of ${user.name}`} className="inline-input" value={user.role}
         onChange={(event) => updateUser.mutate({ userId: user.id, change: { role: event.target.value as Role } })}>
         {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
-      </select>
+      </Select>
     ) },
     { key: "backup", header: "Backup approver", render: (user) => (user.role === "manager" ? (
-      <select aria-label={`Backup approver for ${user.name}`} className="inline-input" value={user.backup_approver_id ?? ""}
+      <Select aria-label={`Backup approver for ${user.name}`} className="inline-input" value={user.backup_approver_id ?? ""}
         onChange={(event) => updateUser.mutate({ userId: user.id, change: { backup_approver_id: event.target.value || null } })}>
         <option value="">None</option>
         {managers.filter((manager) => manager.id !== user.id).map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}
-      </select>
+      </Select>
     ) : <span className="muted">—</span>) },
     { key: "active", header: "Active", render: (user) => (
       <input type="checkbox" aria-label={`${user.name} is active`} checked={user.is_active}
@@ -97,7 +99,7 @@ function UsersTab() {
           <div className="field"><label htmlFor="user-name">Name</label><input id="user-name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></div>
           <div className="field"><label htmlFor="user-email">Email</label><input id="user-email" type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} /></div>
           <div className="field"><label htmlFor="user-role">Role</label>
-            <select id="user-role" value={draft.role} onChange={(event) => setDraft({ ...draft, role: event.target.value as Role })}>{ROLES.map((role) => <option key={role}>{role}</option>)}</select></div>
+            <Select id="user-role" value={draft.role} onChange={(event) => setDraft({ ...draft, role: event.target.value as Role })}>{ROLES.map((role) => <option key={role}>{role}</option>)}</Select></div>
         </div>
         <div className="field" style={{ maxWidth: 320 }}><label htmlFor="user-password">First password</label>
           <input id="user-password" type="password" autoComplete="new-password" value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} /></div>
@@ -189,11 +191,11 @@ function CalendarTab() {
           if (shift.start_time < shift.end_time) createShift.mutate({ ...shift, weekday: Number(shift.weekday) });
         }}>
           <div className="grid-2">
-            <div className="field"><label htmlFor="shift-day">Day</label><select id="shift-day" value={shift.weekday} onChange={(event) => setShift({ ...shift, weekday: event.target.value })}>
-              {WEEKDAYS.map((day, index) => <option key={day} value={index + 1}>{day}</option>)}</select></div>
+            <div className="field"><label htmlFor="shift-day">Day</label><Select id="shift-day" value={shift.weekday} onChange={(event) => setShift({ ...shift, weekday: event.target.value })}>
+              {WEEKDAYS.map((day, index) => <option key={day} value={index + 1}>{day}</option>)}</Select></div>
             <div className="field"><label htmlFor="shift-name">Name</label><input id="shift-name" value={shift.name} onChange={(event) => setShift({ ...shift, name: event.target.value })} /></div>
-            <div className="field"><label htmlFor="shift-start">Start</label><input id="shift-start" type="time" value={shift.start_time} onChange={(event) => setShift({ ...shift, start_time: event.target.value })} /></div>
-            <div className="field"><label htmlFor="shift-end">End</label><input id="shift-end" type="time" value={shift.end_time} onChange={(event) => setShift({ ...shift, end_time: event.target.value })} /></div>
+            <div className="field"><label htmlFor="shift-start">Start</label><TimePicker id="shift-start" value={shift.start_time} required onChange={(start_time) => setShift({ ...shift, start_time })} /></div>
+            <div className="field"><label htmlFor="shift-end">End</label><TimePicker id="shift-end" value={shift.end_time} required onChange={(end_time) => setShift({ ...shift, end_time })} /></div>
           </div>
           {shift.start_time >= shift.end_time ? <p className="error-text">End must be after start.</p> : null}
           <button type="submit" className="button" disabled={createShift.isPending}>Add shift</button>

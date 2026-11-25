@@ -1,6 +1,13 @@
 @import "./tokens.css";
 
 *, *::before, *::after { box-sizing: border-box; }
+* { scrollbar-color: var(--scrollbar-thumb) var(--color-surface-muted); scrollbar-width: thin; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: var(--color-surface-muted); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border: 2px solid var(--color-surface-muted); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+::-webkit-scrollbar-button { display: none; }
+@media (forced-colors: active) { * { scrollbar-color: auto; scrollbar-width: auto; } }
 html, body, #root { height: 100%; margin: 0; }
 body {
   background: var(--color-bg);

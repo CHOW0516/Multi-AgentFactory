@@ -1,3 +1,4 @@
+import { Select } from "../../components/Select";
 import { DatePicker } from "../../components/DatePicker";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -69,17 +70,17 @@ export function OrdersPage() {
         </div>
         <div className="field">
           <label htmlFor="order-status">Status</label>
-          <select id="order-status" value={filters.status} onChange={(event) => update({ status: event.target.value })}>
+          <Select id="order-status" value={filters.status} onChange={(event) => update({ status: event.target.value })}>
             <option value="">All</option>
             {ORDER_STATES.map((state) => <option key={state} value={state}>{stateLabel(state)}</option>)}
-          </select>
+          </Select>
         </div>
         <div className="field">
           <label htmlFor="order-customer">Customer</label>
-          <select id="order-customer" value={filters.customerId} onChange={(event) => update({ customerId: event.target.value })}>
+          <Select id="order-customer" value={filters.customerId} onChange={(event) => update({ customerId: event.target.value })}>
             <option value="">All</option>
             {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
-          </select>
+          </Select>
         </div>
         <div className="field">
           <label htmlFor="order-due">Due by</label>

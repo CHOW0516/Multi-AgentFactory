@@ -1,5 +1,5 @@
 import { lineSvg, onTop, type Plane, type Point3, type Projection } from "../iso/iso-kit";
-import { buildWith, group, outlineRect, panelScrews, roomCamera, slots, track } from "./geometry";
+import { buildWith, group, outlineRect, panelScrews, roomCamera, slots, track, type GeometryDetail } from "./geometry";
 
 export const mapCamera = roomCamera(960, 670, 105);
 export const stations = ["order", "material", "planning", "quality", "monitoring", "maintenance", "simulator"] as const;
@@ -7,12 +7,12 @@ export type Station = typeof stations[number];
 export type MapAgent = "orchestrator" | Station;
 
 
-export function createMapArt(camera: Projection = mapCamera) {
-  const world = buildWith(camera);
-  const local = buildWith({ ...camera, origin: [0, 0] });
+export function createMapArt(camera: Projection = mapCamera, detail: GeometryDetail = "full") {
+  const world = buildWith(camera, detail);
+  const local = buildWith({ ...camera, origin: [0, 0] }, detail);
   const { block, front, legs } = local;
 
-  const frontArt = (x: number, y: number, z: number, body: string) => group(front(x, y, z), body);
+  const frontArt = (x: number, y: number, z: number, body: string) => detail === "motion" ? "" : group(front(x, y, z), body);
   const labelPlate = (width: number, height: number) =>
     outlineRect(0, 0, width, height, "p5-frame", 1.7) + panelScrews(width, height, 2.6) +
     lineSvg(`M0 ${height - 2}H${width}`, { tone: "faint" });
@@ -139,14 +139,14 @@ export function createMapArt(camera: Projection = mapCamera) {
     const at = (distance: number, side = 0): Plane => [from[0] + unit[0] * distance + edge[0] * side, from[1] + unit[1] * distance + edge[1] * side];
     const rails = [-7, 7].map((side) => world.strip(at(0, side), at(span, side), 8, 2, 1.8, "steel")).join("");
     const roll = (distance: number) => world.strip(at(distance, -6), at(distance, 6), 7, 2.5, 1.1, "steel");
-    const supportCount = Math.max(1, Math.ceil(span / 66));
+    const supportCount = detail === "motion" ? 1 : Math.max(1, Math.ceil(span / 66));
     const supports = Array.from({ length: supportCount }, (_, index) => {
       const distance = (index + .5) * span / supportCount;
       const [x, y] = at(distance);
       return world.block(x - 3, y - 3, 0, 6, 6, ringZ, "steel", "lo", 1);
     }).join("");
     return supports + world.strip(from, to, ringZ, 16, 3, "track") + rails +
-      (rollers ? Array.from({ length: Math.floor((span - 8) / 14) }, (_, index) => roll(9 + index * 14)).join("") : "");
+      (rollers && detail === "full" ? Array.from({ length: Math.floor((span - 8) / 14) }, (_, index) => roll(9 + index * 14)).join("") : "");
   }
 
   const ringArt = loop.slice(1).map((point, index) => segment(loop[index], point, true)).join("") +

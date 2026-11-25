@@ -6,7 +6,7 @@ import { floorArt, kindFor } from "../../figures/floor-geometry";
 import { compareDepth } from "../../figures/geometry";
 import { useFigureFrames, useMotionVisibility } from "../../figures/motion";
 import { CameraControls } from "../../figures/CameraControls";
-import { floorProjection, floorViewport, locateInView, projectionAngles } from "./floor-camera";
+import { floorProjection, floorViewport, inspectorOffset, locateInView, projectionAngles } from "./floor-camera";
 import { mechanismTransform, statusNames } from "./model";
 import { useFloorCamera } from "./use-floor-camera";
 
@@ -70,6 +70,7 @@ const Machine = memo(function Machine({ machine, active, onInspect, onHover, art
   const select = () => onInspect(machine.id);
   return <g transform={art.floor.position([machine.floor_x, machine.floor_y, 0])}
     className="p5-scene-target p5-machine" data-machine={machine.id} data-kind={kind ?? "generic"} data-status={machine.status}
+    data-tooltip={`${machine.code} · ${machine.current_order_number ?? "No current order"} · ${machine.part_count} parts`}
     data-active={active || undefined} role="button" tabIndex={0} aria-label={`${machine.name}, ${statusNames[machine.status]}`}
     onClick={select} onKeyDown={(event) => activateOnKey(event, select)} onPointerEnter={() => onHover(machine.id)}
     onPointerLeave={() => onHover(null)} onFocus={() => onHover(machine.id)} onBlur={() => onHover(null)}>
@@ -82,7 +83,6 @@ const Machine = memo(function Machine({ machine, active, onInspect, onHover, art
         <rect className="p5-beacon-on" x="0" y="0" width={width} height="4.1" />
       </g>)}
     </g>
-    <title>{machine.code} · {machine.current_order_number ?? "No current order"} · {machine.part_count} parts</title>
   </g>;
 });
 
@@ -106,7 +106,7 @@ export function FloorScene({ machines, approvals, active, onInspect, onHover, ar
   const { view } = controls;
   const [azimuth, elevation] = projectionAngles(view);
   const camera = useMemo(() => floorProjection(azimuth, elevation), [azimuth, elevation]);
-  const art = useMemo(() => floorArt(camera), [camera]);
+  const art = useMemo(() => floorArt(camera, controls.lowDetail ? "motion" : "full"), [camera, controls.lowDetail]);
   const route = useMemo(() => arrival && art.cartTrack(arrival.x, arrival.y), [arrival, art]);
   const deck = useMemo(() => art.floorDeck(machines), [art, machines]);
   const selected = machines.find((machine) => machine.id === active);
@@ -116,8 +116,7 @@ export function FloorScene({ machines, approvals, active, onInspect, onHover, ar
     const machine = machines.find((entry) => entry.id === focus.id);
     if (!machine) return;
     lastFocus.current = focus;
-    const width = scene.current.clientWidth;
-    const offset: [number, number] = width > 760 ? [0, 18] : [0, -20];
+    const offset = inspecting ? inspectorOffset(scene.current) : [0, 18] as [number, number];
     controls.animate(locateInView(view, [machine.floor_x + 55, machine.floor_y + 39, 47], camera, offset));
   }, [focus, camera, controls, inspecting, machines, view]);
 
@@ -148,7 +147,7 @@ export function FloorScene({ machines, approvals, active, onInspect, onHover, ar
     });
   }, [machines, art]);
 
-  useFigureFrames(visible && !reduced && (Boolean(route) || machines.some((machine) => machine.status === "running")),
+  useFigureFrames(visible && !reduced && !controls.lowDetail && (Boolean(route) || machines.some((machine) => machine.status === "running")),
     (time) => {
       for (const mechanism of runningMechanisms.current) mechanism.node.setAttribute("transform", mechanismTransform(mechanism.kind, time));
       if (route && arrival && cart.current && fixtures.current) {
@@ -173,9 +172,10 @@ export function FloorScene({ machines, approvals, active, onInspect, onHover, ar
   const marker = selected && art.floor.at([selected.floor_x + 48, selected.floor_y + 34, markerArt.markerHeight]);
 
   return <>
-    <span className="sr-only" id={hint}>Drag to orbit. Shift and drag to pan. Scroll or pinch to zoom. On the keyboard, use the arrows, plus, minus, and Home.</span>
+    <span className="sr-only" id={hint}>Drag to orbit. Hold right click and drag to pan. Scroll or pinch to zoom. On the keyboard, use the arrows, plus, minus, and Home.</span>
     <div className="floor-viewport" data-moving={controls.moving || undefined}>
       <svg ref={scene} className="iso-svg p5-scene floor-model" data-animate={visible && !reduced || undefined}
+        data-detail={controls.lowDetail ? "motion" : "full"}
         data-azimuth={azimuth} data-elevation={elevation} data-zoom={view.zoom.toFixed(2)}
         viewBox={`0 0 ${floorViewport.width} ${floorViewport.height}`} aria-label="Interactive isometric factory floor"
         aria-describedby={hint} role="group" tabIndex={0}

@@ -96,7 +96,7 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
     expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute("aria-expanded", "false");
     const approvals = screen.getByRole("link", { name: "Approvals" });
-    expect(approvals).toHaveAttribute("title", "Approvals");
+    expect(approvals).toHaveAttribute("data-tooltip", "Approvals");
     await userEvent.click(approvals);
     expect(screen.getByRole("heading", { name: "Approvals page" })).toBeInTheDocument();
   });

@@ -48,7 +48,6 @@
 }
 
 .floor-viewport { position: absolute; inset: 0; }
-.floor-workspace[data-inspecting] .floor-viewport { right: calc(var(--floor-inspector-width) + var(--floor-inset) * 2); }
 .floor-viewport[data-moving] { cursor: grabbing; }
 .floor-workspace .floor-model {
   display: block;
@@ -152,6 +151,7 @@
 
 .floor-inspector {
   position: absolute;
+  background: var(--color-surface);
   z-index: 4;
   inset: var(--floor-inset) var(--floor-inset) auto auto;
   width: var(--floor-inspector-width);
@@ -218,7 +218,7 @@
   .floor-pointer-hint { display: none; }
 }
 
-/* The inspector owns its space; it never covers the interactive scene. */
+/* Only the floating inspector covers the scene; the canvas stays full width. */
 .floor-workspace[data-inspecting] .floor-overview { max-width: calc(100% - var(--floor-inspector-width) - var(--floor-inset) * 3); }
 .floor-workspace[data-inspecting] .floor-overview h1 { font-size: 25px; }
 .floor-workspace[data-inspecting] .floor-metric { min-width: 0; }
@@ -237,7 +237,6 @@
 .floor-inspector .p5-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
 .floor-inspector .p5-details dd { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) {
-  .floor-workspace[data-inspecting] .floor-viewport { right: 0; bottom: 46%; }
   .floor-workspace[data-inspecting] .floor-overview { max-width: none; }
   .floor-inspector { max-height: 44%; }
 }

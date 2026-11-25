@@ -12,8 +12,8 @@ export function Inspector({ title, code, icon, onLocate, onClose, testId, childr
     <header className="floor-inspector-header">
       <span className="floor-tile-icon"><Icon name={icon} size={23} /></span>
       <div className="floor-inspector-title">{code && <span>{code}</span>}<h2 id={titleId}>{title}</h2></div>
-      <button type="button" className="icon-button" aria-label={icon === "factory" ? "Focus machine" : "Focus agent"} title="Focus selection" onClick={onLocate}><Icon name="focus" size={17} /></button>
-      <button type="button" ref={close} className="icon-button" aria-label="Close details" title="Close details" onClick={onClose}><Icon name="close" size={16} /></button>
+      <button type="button" className="icon-button" aria-label={icon === "factory" ? "Focus machine" : "Focus agent"} data-tooltip="Focus selection" onClick={onLocate}><Icon name="focus" size={17} /></button>
+      <button type="button" ref={close} className="icon-button" aria-label="Close details" data-tooltip="Close details" onClick={onClose}><Icon name="close" size={16} /></button>
     </header>
     <div className="floor-inspector-body">{children}</div>
   </section>;
