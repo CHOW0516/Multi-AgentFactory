@@ -254,7 +254,7 @@ async def check_and_hold(
 
     await session.flush()
     result = CheckAndHoldResult(
-        material_ready_date=current.ready_date,
+        material_ready_date=current.ready_date if current.ready_date != UNKNOWN_READY_DATE else None,
         shortages=current.shortages,
         hold_ids=[hold.id for hold in holds],
         hold_expires_at=expiration if any(hold.hold_type == "temporary" for hold in holds) else None,

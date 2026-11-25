@@ -253,7 +253,7 @@ async def clear_proposals(session: AsyncSession, order_id: UUID, option_id: UUID
 async def plan_order(
     session: AsyncSession,
     order_id: UUID,
-    material_ready_date: date,
+    material_ready_date: date | None,
     task_id: UUID | None = None,
     *,
     outage: ReplanForMachinePayload | None = None,
@@ -277,8 +277,9 @@ async def plan_order(
     if not lines or any(line.part_id is None or line.quantity <= 0 for line in lines):
         raise ValueError("Order requires verified lines with parts and positive quantities")
     items = [(line.part_id, line.quantity) for line in lines]
+    # The scheduler uses date.max for "material date unknown"; it then offers no promised option.
     scenario = await load_scenario(
-        session, items, material_ready_date, order.due_date, order=order, outage=outage
+        session, items, material_ready_date or date.max, order.due_date, order=order, outage=outage
     )
     candidates, reasons = await asyncio.to_thread(propose, scenario)
 

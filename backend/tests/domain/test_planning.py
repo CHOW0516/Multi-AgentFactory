@@ -305,3 +305,10 @@ async def test_schedule_includes_overlap_and_maintenance(
     )
     assert result.status_code == 200, result.text
     assert len(result.json()["slots"]) == len(result.json()["maintenance"]) == 1
+
+
+async def test_unknown_material_date_gives_no_promised_option(capacity, make_order, db_session):
+    await capacity(cycle_seconds=1800)
+    order = await make_order(quantity=10, due_date=MONDAY)
+    result = await service.plan_order(db_session, order.id, None)
+    assert result.recommended_option_id is None

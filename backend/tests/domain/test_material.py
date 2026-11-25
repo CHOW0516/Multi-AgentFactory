@@ -81,6 +81,15 @@ async def test_expiry_frees_stock_and_invalidates_a_recheck(catalog, make_order,
     assert await db_session.scalar(select(AuditLog.id).where(AuditLog.action == "expire_hold"))
 
 
+async def test_shortage_without_supplier_has_unknown_ready_date(catalog, make_order, make_stock, db_session):
+    await set_bom(db_session, catalog, quantity=2)
+    order = await make_order()
+    await make_stock(1)
+    result = await check_and_hold(db_session, order.id)
+    assert result.shortages and result.shortages[0].arrives is None
+    assert result.material_ready_date is None
+
+
 async def test_bom_scrap_and_shortest_supplier_lead_time(catalog, make_order, make_stock, db_session):
     await set_bom(db_session, catalog, quantity=2, scrap=Decimal("0.1"))
     order = await make_order()

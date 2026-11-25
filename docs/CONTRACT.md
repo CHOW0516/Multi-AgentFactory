@@ -92,11 +92,11 @@ Exchange `factory` (topic). Task queues: `agent.order`, `agent.material`, `agent
 | order (P2) | `extract_document` | `{document_id}` | `{order_id, fields_needing_check: [field_name], quotation_mismatches: [{field, po_value, quote_value}]}` |
 | order (P2) | `draft_customer_reply` | `{order_id, plan_option_id}` | `{customer_message_id}` |
 | order (P2) | `close_order` | `{order_id}` | `{}` |
-| material (P2) | `check_and_hold` | `{order_id}` | `{material_ready_date, shortages: [{material_id, short_qty, arrives}], hold_ids, hold_expires_at, data_warnings: [str]}` |
+| material (P2) | `check_and_hold` | `{order_id}` | `{material_ready_date (null when a shortage has no known arrival), shortages: [{material_id, short_qty, arrives}], hold_ids, hold_expires_at, data_warnings: [str]}` |
 | material (P2) | `recheck_holds` | `{order_id}` | `{valid: bool, changes: [str]}` |
 | material (P2) | `confirm_holds` / `release_holds` | `{order_id}` | `{}` |
 | material (P2) | `create_purchase_requests` | `{order_id}` | `{purchase_request_ids}` |
-| planning (P2) | `plan_order` | `{order_id, material_ready_date}` | `{plan_option_ids, recommended_option_id, can_meet_due_date: bool}` |
+| planning (P2) | `plan_order` | `{order_id, material_ready_date (may be null)}` | `{plan_option_ids, recommended_option_id, can_meet_due_date: bool}` |
 | planning (P2) | `recheck_plan` | `{order_id, plan_option_id}` | `{valid: bool, changes: [str]}` |
 | planning (P2) | `lock_plan` / `release_plan` | `{order_id, plan_option_id?}` | `{}` |
 | planning (P2) | `replan_for_machine` | `{machine_id, unavailable_from, unavailable_to}` | `{affected_order_ids, plan_option_ids_by_order}` |

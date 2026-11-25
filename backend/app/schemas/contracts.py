@@ -58,7 +58,7 @@ class Shortage(Contract):
 
 
 class CheckAndHoldResult(Contract):
-    material_ready_date: date
+    material_ready_date: date | None  # None: a shortage has no known arrival date
     shortages: list[Shortage]
     hold_ids: list[uuid.UUID]
     hold_expires_at: datetime | None
@@ -77,7 +77,7 @@ class CreatePurchaseRequestsResult(Contract):
 # ---- planning agent ----
 class PlanOrderPayload(Contract):
     order_id: uuid.UUID
-    material_ready_date: date
+    material_ready_date: date | None  # None: material date unknown, so no promised option
 
 
 class PlanOrderResult(Contract):
