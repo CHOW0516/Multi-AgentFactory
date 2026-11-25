@@ -2,7 +2,7 @@ import type { KpiTile as KpiTileData } from "../api/types";
 import { formatNumber } from "./format";
 
 export function KpiTile({ tile }: { tile: KpiTileData }) {
-  const decimals = Number.isInteger(tile.value) ? 0 : 1;
+  const decimals = Number.isInteger(tile.value) ? 0 : Math.abs(tile.value) < 1 ? 2 : 1;
   return (
     <div className="card kpi-tile">
       <div className="kpi-label">{tile.label}</div>
