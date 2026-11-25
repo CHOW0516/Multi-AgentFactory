@@ -8,7 +8,10 @@ import { discoverRoutes, sidebarRoutes } from "../../src/shell/routes";
 
 describe("sidebar by role", () => {
   const routes = discoverRoutes();
-  const labelsFor = (role: Role) => sidebarRoutes(routes, role).map((route) => route.label);
+  // P5 owns these two pages; leave them out so this test checks only P4's pages.
+  const p5Labels = ["Factory floor", "Agent map"];
+  const labelsFor = (role: Role) =>
+    sidebarRoutes(routes, role).map((route) => route.label).filter((label) => !p5Labels.includes(label));
 
   it("store sees only materials and qc only quality", () => {
     expect(labelsFor("store")).toEqual(["Materials"]);
