@@ -27,6 +27,7 @@ function paintParcel(path: SVGPathElement, parcel: ScheduledParcel, time: number
   if (path.getAttribute("data-parcel") !== parcel.id) {
     path.setAttribute("d", parcelShapes[parcel.kind]);
     path.setAttribute("data-parcel", parcel.id);
+    path.setAttribute("data-testid", "agent-token");
     path.setAttribute("data-rail", parcel.link);
     path.setAttribute("data-kind", parcel.kind);
   }
@@ -36,6 +37,7 @@ function clearParcel(node: SVGPathElement) {
   if (node.hasAttribute("data-parcel")) {
     node.setAttribute("opacity", "0");
     node.removeAttribute("data-parcel");
+    node.removeAttribute("data-testid");
   }
 }
 
@@ -50,7 +52,7 @@ const StationUnit = memo(function StationUnit({ name, stats, failed, active, onI
   const item = stationArt[name];
   const show = () => onInspect(name);
   const counter = stats ? `${stats.queue_depth} | ${stats.in_progress}` : "— | —";
-  return <g transform={item.transform} className="p5-scene-target p5-station" data-station={name}
+  return <g transform={item.transform} className="p5-scene-target p5-station" data-station={name} data-testid={`agent-node-${name}`}
     data-failed={failed || undefined} data-working={active || undefined} role="button" tabIndex={0}
     aria-label={`${item.label} station`} onClick={show} onKeyDown={(event) => activateOnKey(event, show)}>
     <g dangerouslySetInnerHTML={{ __html: item.body }} />

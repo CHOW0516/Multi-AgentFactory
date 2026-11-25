@@ -27,7 +27,7 @@ export function Metrics({ items }: { items: [string, ReactNode][] }) {
     <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
 }
 
-export function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Drawer({ title, onClose, children, testId }: { title: string; onClose: () => void; children: ReactNode; testId?: string }) {
   const id = useId();
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -39,7 +39,7 @@ export function Drawer({ title, onClose, children }: { title: string; onClose: (
       else dialog?.removeAttribute("open");
     };
   }, []);
-  return <dialog ref={ref} aria-labelledby={id} className="p5-drawer" onCancel={(event) => {
+  return <dialog ref={ref} aria-labelledby={id} className="p5-drawer" data-testid={testId} onCancel={(event) => {
     event.preventDefault();
     onClose();
   }} onClick={(event) => {

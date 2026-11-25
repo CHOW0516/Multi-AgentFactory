@@ -6,5 +6,5 @@ import { installAgentMocks } from "./mocks";
 if (USE_MOCKS) installAgentMocks();
 
 export default {
-  path: "/agents", label: "Agent map", icon: "agents", roles: ["manager", "admin", "planner"], order: 80, element: <AgentMap />,
+  path: "/agent-map", label: "Agent map", icon: "agents", roles: ["manager", "admin", "planner"], order: 80, element: <AgentMap />,
 } satisfies PageRoute;
