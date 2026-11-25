@@ -28,7 +28,7 @@ describe("chat", () => {
     render(<ChatPanel stream={stream} />);
     expect(screen.getByText("About SO-1")).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("Message"), "Is it late?{Enter}");
-    expect(screen.getByText("Is it late?")).toBeInTheDocument();
+    expect(await screen.findByText("Is it late?")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("The order is on time.")).toBeInTheDocument());
     expect(screen.getByText(/get_order\(SO-1\)/)).toBeInTheDocument();
   });
