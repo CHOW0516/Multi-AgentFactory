@@ -12,6 +12,7 @@ export async function fetchOrNull<Result>(path: string): Promise<Result | null> 
 
 /** Lists come back as a plain array or as Page<T>; this gives the items either way. */
 export function itemsOf<Item>(data: Item[] | { items: Item[] } | null | undefined): Item[] {
-  if (!data) return [];
-  return Array.isArray(data) ? data : data.items;
+  if (Array.isArray(data)) return data;
+  // Anything else (null, an error body, an unexpected shape) is treated as an empty list.
+  return Array.isArray(data?.items) ? data.items : [];
 }
