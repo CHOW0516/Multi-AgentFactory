@@ -13,6 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.planning.service import what_if
 from app.api.master_data import commit_or_conflict, create_row, flush_or_conflict, get_or_404
 from app.api.orders import sales_only
+from app.core.security import require_roles
+
+# Managers and admins can view quotations and run the read-only date check; only sales can create or edit.
+quotation_reader = require_roles("sales", "manager", "admin")
 from app.core.audit import write_audit
 from app.core.config import settings
 from app.core.db import get_session
@@ -28,7 +32,7 @@ async def list_quotations(
     customer_id: UUID | None = None,
     status: QuoteStatus | None = None,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(sales_only),
+    user: User = Depends(quotation_reader),
 ):
     query = select(Quotation).order_by(Quotation.created_at.desc(), Quotation.id)
     if customer_id is not None:
@@ -42,7 +46,7 @@ async def list_quotations(
 async def get_quotation(
     quotation_id: UUID,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(sales_only),
+    user: User = Depends(quotation_reader),
 ):
     return await get_or_404(session, Quotation, quotation_id)
 
@@ -118,7 +122,7 @@ async def edit_quotation(
 async def check_date(
     quotation_id: UUID,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(sales_only),
+    user: User = Depends(quotation_reader),
 ):
     quote = await get_or_404(session, Quotation, quotation_id)
     if quote.quoted_due_date is None:

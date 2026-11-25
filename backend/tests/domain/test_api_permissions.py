@@ -83,6 +83,8 @@ async def test_material_and_quotation_permissions(client, auth_headers, catalog,
     assert created.status_code == 201, created.text
     url = f"/api/quotations/{created.json()['id']}"
     assert (await client.get(url, headers=store)).status_code == 403
+    assert (await client.get(url, headers=manager)).status_code == 200
+    assert (await client.get("/api/quotations", headers=manager)).status_code == 200
     assert (await client.patch(url, headers=manager, json={"quantity": 9})).status_code == 403
     changed = await client.patch(url, headers=sales, json={"quantity": 9})
     assert changed.status_code == 200 and int(float(changed.json()["quantity"])) == 9

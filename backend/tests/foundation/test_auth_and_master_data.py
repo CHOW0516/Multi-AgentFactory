@@ -94,3 +94,16 @@ async def test_settings_admin_only_and_validated(client, auth_headers):
 async def test_token_in_query_works_for_file_links(client, auth_headers):
     token = auth_headers("sales")["Authorization"].split(" ", 1)[1]
     assert (await client.get(f"/api/auth/me?token={token}")).status_code == 200
+
+
+async def test_update_writes_audit_with_new_updated_at(client, auth_headers, db_session):
+    from sqlalchemy import select
+
+    from app.models import AuditLog
+
+    created = await client.post("/api/customers", json={"code": "UPD", "name": "Before"}, headers=auth_headers("planner"))
+    url = f"/api/customers/{created.json()['id']}"
+    changed = await client.patch(url, json={"code": "UPD", "name": "After"}, headers=auth_headers("planner"))
+    assert changed.status_code == 200, changed.text
+    audit = await db_session.scalar(select(AuditLog).where(AuditLog.entity == "customers", AuditLog.action == "update"))
+    assert audit is not None
