@@ -117,3 +117,26 @@ button.gantt-bar { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .skeleton-line { animation: none; }
 }
+
+/* upload */
+.drop-zone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); padding: var(--space-6) var(--space-4); border: 2px dashed var(--color-border); border-radius: var(--radius); cursor: pointer; text-align: center; margin: var(--space-4) 0; }
+.drop-zone.dragging, .drop-zone:hover { border-color: var(--color-accent); background: var(--color-accent-soft); }
+
+/* field check and extracted fields */
+.field-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.field-table td, .field-table th { padding: 8px 6px; border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: top; }
+.field-table th { font-weight: 500; color: var(--color-text-muted); font-size: 13px; }
+.field-table tr.flagged td { background: var(--color-accent-soft); }
+.field-table input { width: 100%; padding: 6px 8px; border-radius: var(--radius-small); border: 1px solid var(--color-accent); background: var(--color-surface); color: var(--color-text); font: inherit; }
+.confidence-low { color: var(--color-danger); font-weight: 500; }
+.corrected-note { font-size: 12px; color: var(--color-text-muted); }
+
+/* timeline */
+.timeline { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--color-border); }
+.timeline li { position: relative; padding: 0 0 var(--space-4) var(--space-4); }
+.timeline li::before { content: ""; position: absolute; left: -6px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--color-surface); border: 2px solid var(--color-text-muted); }
+.timeline li.kind-human_action::before { border-color: var(--color-accent); background: var(--color-accent); }
+.timeline .timeline-time { font-size: 12px; color: var(--color-text-muted); }
+.message-preview { white-space: pre-wrap; font-family: inherit; background: var(--color-surface-muted); border-radius: var(--radius-small); padding: var(--space-4); margin: 0; font-size: 14px; }
+.split-view { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+@media (max-width: 1100px) { .split-view { grid-template-columns: 1fr; } }
