@@ -111,9 +111,32 @@ async def test_machine_tick_publishes_running_count_and_idle(db_session, fake_br
     await simulation.tick(now, 20)
     assert ("status", "running") not in _events_for(fake_broker, machine)
 
-    # After the slot ends the machine goes idle.
+    # After the slot ends it sends the full quantity once, then the machine goes idle.
     fake_broker.published.clear()
     await simulation.tick(now + timedelta(hours=2), 20)
+    assert _events_for(fake_broker, machine) == [("count", "100"), ("status", "idle")]
+
+    fake_broker.published.clear()
+    await simulation.tick(now + timedelta(hours=3), 20)
+    assert _events_for(fake_broker, machine) == []
+
+
+async def test_no_final_count_when_slot_stops_early(db_session, fake_broker, monkeypatch):
+    from sqlalchemy import update
+
+    from app.models import ScheduleSlot
+
+    monkeypatch.setattr(settings, "sim_breakdown_chance_per_hour", 0.0)
+    now = datetime.now(UTC)
+    machine = await _seeded_machine_with_slot(db_session, now)
+    simulation = runtime.MachineSimulation(random.Random(7))
+    await simulation.tick(now, 20)
+
+    # The slot is moved back to tentative (for example by a replan) before it ends.
+    await db_session.execute(update(ScheduleSlot).values(status="tentative"))
+    await db_session.commit()
+    fake_broker.published.clear()
+    await simulation.tick(now + timedelta(minutes=1), 20)
     assert _events_for(fake_broker, machine) == [("status", "idle")]
 
 
