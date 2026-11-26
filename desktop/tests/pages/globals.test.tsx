@@ -56,6 +56,7 @@ describe("chat", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
     expect(container.textContent).not.toContain("|");
     expect(container.textContent).not.toContain("**");
+    expect(screen.getByRole("cell", { name: "Running" }).querySelector(".status-dot")).not.toBeNull();
   });
 
   it("splits Markdown into blocks", () => {

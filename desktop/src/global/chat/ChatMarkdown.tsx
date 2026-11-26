@@ -1,6 +1,16 @@
 // Shows the orchestrator's Markdown reply as formatted text: headings, paragraphs, bullet and numbered lists,
 // tables, **bold**, *italic* and `code`. Builds React elements only (no HTML injection).
 import type { ReactNode } from "react";
+import { MachineStatusBadge } from "../../components/StatusBadge";
+import type { MachineStatus } from "../../api/types";
+
+const MACHINE_STATUSES: MachineStatus[] = ["running", "idle", "setup", "down", "maintenance"];
+
+/** A table cell that is only a machine status ("Running", "**Down**") shows as the same pill as the rest of the app. */
+function tableCell(cell: string): ReactNode {
+  const status = cell.replace(/\*/g, "").trim().toLowerCase() as MachineStatus;
+  return MACHINE_STATUSES.includes(status) ? <MachineStatusBadge status={status} /> : renderInline(cell);
+}
 
 type Block =
   | { kind: "heading"; text: string }
@@ -99,7 +109,7 @@ export function ChatMarkdown({ text }: { text: string }) {
                   ) : null}
                   <tbody>
                     {block.rows.map((row, rowIndex) => (
-                      <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{renderInline(cell)}</td>)}</tr>
+                      <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{tableCell(cell)}</td>)}</tr>
                     ))}
                   </tbody>
                 </table>
