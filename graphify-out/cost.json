@@ -13,8 +13,17 @@
       "output_tokens": 0,
       "token_usage_available": false,
       "files": 285
+    },
+    {
+      "date": "2026-11-26T12:37:26.683456+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "token_usage_available": false,
+      "files": 325,
+      "built_at_commit": "3afc2a82b4d8b00c1e1c57f9d17f345b97e938a7"
     }
   ],
   "total_input_tokens": 0,
-  "total_output_tokens": 0
+  "total_output_tokens": 0,
+  "note": "Token counts marked unavailable use zero placeholders and are excluded from measured cost claims."
 }
