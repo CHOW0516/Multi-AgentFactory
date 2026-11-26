@@ -300,3 +300,5 @@ button.gantt-bar { cursor: pointer; }
   .dashboard-summary .kpi-tile:nth-child(2n + 1) { border-left: 0; }
   .chart-card > header { align-items: flex-start; }
 }
+
+.delivery-confidence .confidence-poor { color: var(--color-danger); }

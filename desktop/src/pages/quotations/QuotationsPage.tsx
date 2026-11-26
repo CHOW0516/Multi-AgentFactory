@@ -8,6 +8,7 @@ import { itemsOf } from "../../components/api-helpers";
 import { DataTable, type Column } from "../../components/DataTable";
 import { Drawer } from "../../components/Dialog";
 import { formatDate, formatNumber } from "../../components/format";
+import { ConfidenceText } from "../../components/DeliveryConfidence";
 import { Money } from "../../components/Money";
 import { PageHeader } from "../../components/PageHeader";
 
@@ -70,6 +71,7 @@ function WhatIfAnswer({ result }: { result: WhatIfResult }) {
     <div className={`banner${result.can_meet_due_date ? "" : " banner-warning"}`} role="status">
       <strong>{result.can_meet_due_date ? "Yes, the date works." : "No, not by that date."}</strong>
       <div className="small">Earliest finish {formatDate(result.earliest_finish_date)} · material ready {formatDate(result.material_ready_date)}</div>
+      {result.confidence ? <div className="small">Confidence: <ConfidenceText confidence={result.confidence} /></div> : null}
       {result.explanation ? <p className="small" style={{ marginBottom: 0 }}>{result.explanation}</p> : null}
     </div>
   );

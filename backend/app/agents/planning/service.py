@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.material.service import UNKNOWN_READY_DATE, forecast, order_requirements, requirements
 from app.agents.planning.calendar import Window, calendar, overlaps
+from app.agents.planning.confidence import SimJob, as_dict, confidence_for
 from app.agents.planning.options import HOUR, Candidate, Scenario, propose, slot_snapshot
 from app.agents.planning.solver import Job
 from app.api.settings import effective_settings
@@ -637,9 +638,16 @@ async def what_if(session: AsyncSession, request: WhatIfRequest) -> WhatIfResult
         if candidate.optimal
         else "Best feasible delivery found within the solver time limit"
     )
+    confidence = await confidence_for(
+        session,
+        [SimJob(row.machine_id, row.step, row.start, row.end, True) for row in candidate.placements],
+        request.due_date,
+        f"{request.part_id}-{quantity}-{request.due_date}",
+    )
     return WhatIfResult(
         can_meet_due_date=candidate.finish_date <= request.due_date,
         earliest_finish_date=candidate.finish_date,
         material_ready_date=report.ready_date,
         explanation=f"{prefix} is {candidate.finish_date:%d %B %Y}.",
+        confidence=as_dict(confidence),
     )

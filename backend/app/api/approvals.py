@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_, select
 
+from app.agents.planning.confidence import as_dict, confidence_for_option
 from app.core.audit import write_audit
 from app.core.db import get_session
 from app.core.security import current_user
@@ -22,7 +23,13 @@ from app.models import (
 )
 from app.orchestrator.read_models import material_status, schedule_rows
 from app.orchestrator.workflow import apply_decision, find_run, lock_order
-from app.schemas.api import ApprovalDecisionIn, ApprovalPack, ApprovalSummary, QuotationComparison
+from app.schemas.api import (
+    ApprovalDecisionIn,
+    ApprovalPack,
+    ApprovalSummary,
+    PlanOptionOut,
+    QuotationComparison,
+)
 
 router = APIRouter(tags=["approvals"])
 
@@ -151,7 +158,13 @@ async def pack(approval_id: uuid.UUID, session=Depends(get_session), user=Depend
         fields=fields,
         quotation_comparison=await compare_quote(session, order),
         material=await material_status(session, order.id),
-        plan_options=options,
+        plan_options=[
+            PlanOptionOut.model_validate(
+                PlanOptionOut.model_validate(option).model_dump()
+                | {"confidence": as_dict(await confidence_for_option(session, option, order))}
+            )
+            for option in options
+        ],
         gantt_slots=gantt,
         customer_message=draft,
         what_changed=row.what_changed,

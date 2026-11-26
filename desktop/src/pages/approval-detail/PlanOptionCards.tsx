@@ -1,5 +1,6 @@
 import type { PlanOptionOut } from "../../api/types";
 import { formatDate, formatNumber, nameLabel } from "../../components/format";
+import { ConfidenceText } from "../../components/DeliveryConfidence";
 import { Money } from "../../components/Money";
 
 const OPTION_TITLES: Record<PlanOptionOut["option_type"], string> = {
@@ -20,6 +21,7 @@ export function PlanOptionCards({ options, selectedId, onSelect, disabled }: {
           <h3>{OPTION_TITLES[option.option_type] ?? nameLabel(option.option_type)}</h3>
           <dl>
             <dt>Finish</dt><dd>{formatDate(option.finish_date)}</dd>
+            {option.confidence ? <><dt>Confidence</dt><dd><ConfidenceText confidence={option.confidence} /></dd></> : null}
             {option.split_quantity_first ? <><dt>First part</dt><dd>{formatNumber(option.split_quantity_first)} pcs by {formatDate(option.split_finish_date_first)}</dd></> : null}
             <dt>Overtime</dt><dd>{Number(option.overtime_hours) > 0 ? `${formatNumber(option.overtime_hours, 1)} h` : "None"}</dd>
             <dt>Extra cost</dt><dd>{Number(option.extra_cost) > 0 ? <Money value={option.extra_cost} /> : "None"}</dd>

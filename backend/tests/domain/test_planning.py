@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from app.agents.planning import service
 from app.agents.planning.options import propose
-from app.models import Holiday, Machine, MaintenanceEvent, PlanOption, Routing, ScheduleSlot, Shift, StockHold
+from app.models import Holiday, Machine, MaintenanceEvent, PlanOption, ScheduleSlot, StockHold
 from app.schemas.contracts import ReplanForMachinePayload
 
 MONDAY = date(2027, 1, 4)
@@ -17,34 +17,6 @@ TUESDAY = date(2027, 1, 5)
 
 def at(day, hour):
     return datetime.combine(day, time(hour), tzinfo=UTC)
-
-
-@pytest.fixture
-async def capacity(db_session, catalog, planning_clock, fake_ai):
-    async def setup(cycle_seconds=3600):
-        machine = Machine(code="MILL-01", name="Mill 1", machine_type="milling")
-        db_session.add_all(
-            [
-                machine,
-                Routing(
-                    part_id=catalog.part.id,
-                    step_number=1,
-                    machine_type="milling",
-                    setup_minutes=0,
-                    cycle_seconds_per_part=cycle_seconds,
-                ),
-                *[
-                    Shift(name="Day", weekday=weekday, start_time=time(8), end_time=time(12))
-                    for weekday in range(5)
-                ],
-            ]
-        )
-        await db_session.commit()
-        for _ in range(15):
-            fake_ai.add_response(text="This option fits the available production capacity.")
-        return machine
-
-    return setup
 
 
 async def options(db_session, result):

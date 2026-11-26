@@ -143,9 +143,11 @@ export function planOptionsFor(order: OrderDetail): PlanOptionOut[] {
   const base = { split_quantity_first: null, split_finish_date_first: null, machine_load: { "CNC-01": 0.82, "LTH-01": 0.64 }, status: "proposed" };
   return [
     { ...base, id: childId(order.id, "pa"), option_type: "as_requested", finish_date: due, overtime_hours: "0", extra_cost: "0",
-      margin: "0.24", impacted_orders: [], explanation: "Fits the requested date with today's load; no other order moves.", is_recommended: !order.id.endsWith("7") },
+      margin: "0.24", impacted_orders: [], explanation: "Fits the requested date with today's load; no other order moves.", is_recommended: !order.id.endsWith("7"),
+      confidence: { chance_on_time: 72, likely_date: due, safe_date: isoDay(16), runs: 200 } },
     { ...base, id: childId(order.id, "pb"), option_type: "overtime", finish_date: due, overtime_hours: "6", extra_cost: "540.00",
-      margin: "0.21", impacted_orders: [], explanation: "6 hours of Saturday overtime on CNC-01 keeps the date if the stainless sheet arrives late.", is_recommended: false },
+      margin: "0.21", impacted_orders: [], explanation: "6 hours of Saturday overtime on CNC-01 keeps the date if the stainless sheet arrives late.", is_recommended: false,
+      confidence: { chance_on_time: 91, likely_date: due, safe_date: due, runs: 200 } },
     { ...base, id: childId(order.id, "pc"), option_type: "delay", finish_date: isoDay(21), overtime_hours: "0", extra_cost: "0",
       margin: "0.24", impacted_orders: [], explanation: "Finishing 6 days later needs no overtime and waits for the material delivery.", is_recommended: order.id.endsWith("7") },
     { ...base, id: childId(order.id, "pd"), option_type: "move_other_order", finish_date: due, overtime_hours: "0", extra_cost: "0",

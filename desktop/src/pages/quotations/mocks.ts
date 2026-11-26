@@ -8,6 +8,7 @@ function whatIf(dueDate: string | null): WhatIfResult {
   const canMeet = Boolean(dueDate && dueDate >= earliest);
   return {
     can_meet_due_date: canMeet, earliest_finish_date: earliest, material_ready_date: isoDay(4),
+    confidence: { chance_on_time: canMeet ? 86 : 12, likely_date: earliest, safe_date: isoDay(12), runs: 200 },
     explanation: canMeet ? "CNC-01 has room in that week and the bar stock is on hand."
       : `CNC-01 is full until ${earliest}; overtime could bring it 2 days earlier.`,
   };

@@ -43,7 +43,8 @@ export interface ExtractedFieldOut { id: Uuid; field_name: string; value: string
 export interface FieldCorrection { field_id: Uuid; corrected_value: string }
 export interface ImpactedOrder { order_id: Uuid; order_number: string; old_finish: IsoDate | null; new_finish: IsoDate | null; still_meets_due_date: boolean }
 export type PlanOptionType = "as_requested" | "delay" | "split" | "overtime" | "move_other_order";
-export interface PlanOptionOut { id: Uuid; option_type: PlanOptionType; finish_date: IsoDate; split_quantity_first: DecimalString | null; split_finish_date_first: IsoDate | null; overtime_hours: DecimalString; extra_cost: DecimalString; margin: DecimalString | null; machine_load: Record<string, number> | null; impacted_orders: ImpactedOrder[]; explanation: string | null; is_recommended: boolean; status: string }
+export interface DeliveryConfidence { chance_on_time: number | null; likely_date: IsoDate; safe_date: IsoDate; runs: number }
+export interface PlanOptionOut { id: Uuid; option_type: PlanOptionType; finish_date: IsoDate; split_quantity_first: DecimalString | null; split_finish_date_first: IsoDate | null; overtime_hours: DecimalString; extra_cost: DecimalString; margin: DecimalString | null; machine_load: Record<string, number> | null; impacted_orders: ImpactedOrder[]; explanation: string | null; is_recommended: boolean; status: string; confidence?: DeliveryConfidence | null }
 export interface MaterialNeed { material_id: Uuid; material_code: string; material_name: string; unit: string; needed: DecimalString; available: DecimalString; held: DecimalString; short: DecimalString; arrives: IsoDate | null; last_counted_at: IsoDateTime | null }
 export interface MaterialStatusOut { material_ready_date: IsoDate | null; hold_expires_at: IsoDateTime | null; needs: MaterialNeed[]; data_warnings: string[] }
 export interface CustomerMessageOut { id: Uuid; order_id: Uuid; plan_option_id: Uuid | null; subject: string; draft_text: string; status: "draft" | "sent_by_sales"; sent_at: IsoDateTime | null }
@@ -59,7 +60,7 @@ export interface CycleCountIn { material_id: Uuid; counted_quantity: DecimalStri
 export interface QuotationOut { id: Uuid; quote_number: string; customer_id: Uuid; part_id: Uuid; quantity: DecimalString; unit_price: DecimalString; quoted_due_date: IsoDate | null; status: string }
 export interface QuotationIn { customer_id: Uuid; part_id: Uuid; quantity: DecimalString | number; unit_price: DecimalString | number; quoted_due_date?: IsoDate | null }
 export interface WhatIfRequest { part_id: Uuid; quantity: DecimalString | number; due_date: IsoDate }
-export interface WhatIfResult { can_meet_due_date: boolean; earliest_finish_date: IsoDate; material_ready_date: IsoDate; explanation: string | null }
+export interface WhatIfResult { can_meet_due_date: boolean; earliest_finish_date: IsoDate; material_ready_date: IsoDate; explanation: string | null; confidence?: DeliveryConfidence | null }
 export interface ScheduleSlotOut { id: Uuid; order_id: Uuid; order_number: string; machine_id: Uuid; routing_step: number; quantity: DecimalString; start_at: IsoDateTime; end_at: IsoDateTime; status: "tentative" | "locked" | "done"; is_overtime: boolean }
 export interface MaintenanceWindowOut { machine_id: Uuid; start_at: IsoDateTime; end_at: IsoDateTime | null; maintenance_type: "breakdown" | "planned" }
 export interface ScheduleOut { slots: ScheduleSlotOut[]; maintenance: MaintenanceWindowOut[] }

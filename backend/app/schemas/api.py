@@ -266,6 +266,15 @@ class ImpactedOrder(BaseModel):
     still_meets_due_date: bool
 
 
+class DeliveryConfidence(ApiModel):
+    """The plan replayed many times with random breakdowns and slower runs (no AI)."""
+
+    chance_on_time: int | None  # percent of runs that ship by the due date
+    likely_date: date  # half the runs ship by this date
+    safe_date: date  # 9 in 10 runs ship by this date
+    runs: int
+
+
 class PlanOptionOut(ApiModel):
     id: uuid.UUID
     option_type: Literal["as_requested", "delay", "split", "overtime", "move_other_order"]
@@ -280,6 +289,7 @@ class PlanOptionOut(ApiModel):
     explanation: str | None
     is_recommended: bool
     status: str
+    confidence: DeliveryConfidence | None = None
 
 
 class MaterialNeed(ApiModel):
@@ -404,6 +414,7 @@ class WhatIfResult(ApiModel):
     earliest_finish_date: date
     material_ready_date: date
     explanation: str | None
+    confidence: DeliveryConfidence | None = None
 
 
 class ScheduleSlotOut(ApiModel):
