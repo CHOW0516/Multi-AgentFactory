@@ -45,6 +45,24 @@ echo "Restoring $file_name ..."
 docker compose run --rm --no-deps -T --entrypoint sh backup -c \
     "pg_restore --clean --if-exists --no-owner --single-transaction --dbname=\"\$PGDATABASE\" /backups/$file_name"
 
+documents_file="documents-${file_name#factory-}"
+documents_file="${documents_file%.dump}.tar.gz"
+if [ -f "backups/$documents_file" ]; then
+    echo "Restoring PO files from $documents_file ..."
+    docker compose run --rm --no-deps -T -v factory-commit_documents:/restore --entrypoint sh backup -c \
+        "tar -xzf /backups/$documents_file -C /restore"
+else
+    echo "No PO file archive found for this dump ($documents_file); PO files were not restored."
+fi
+
+# Messages in the queue refer to the state before the restore; drop them so agents do not act on them.
+if docker compose ps --services --status running | grep -qx rabbitmq; then
+    echo "Purging message queues ..."
+    for queue in $(docker compose exec -T rabbitmq rabbitmqctl -q list_queues name | grep -E '^(agent|orchestrator|monitoring)\.'); do
+        docker compose exec -T rabbitmq rabbitmqctl -q purge_queue "$queue" >/dev/null
+    done
+fi
+
 if [ -n "$services_to_restart" ]; then
     echo "Starting:$services_to_restart"
     # shellcheck disable=SC2086

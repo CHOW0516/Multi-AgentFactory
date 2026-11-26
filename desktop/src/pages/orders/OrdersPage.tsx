@@ -15,7 +15,7 @@ import { UploadPoDrawer } from "./UploadPoDrawer";
 export const ORDER_STATES: OrderState[] = [
   "RECEIVED", "EXTRACTED", "NEEDS_FIELD_CHECK", "VERIFIED", "MATERIAL_CHECKED", "PLANNED", "WAITING_APPROVAL",
   "RECHECKING", "CONFIRMED", "REPLY_DRAFTED", "CUSTOMER_REPLIED", "IN_PRODUCTION", "COMPLETED", "REJECTED",
-  "DECLINED", "REPLAN_NEEDED", "FAILED",
+  "DECLINED", "REPLAN_NEEDED", "FAILED", "WAITING_CUSTOMER", "CANCELLED", "SENDER_REVIEW",
 ];
 
 interface OrderFilters { status: string; customerId: string; dueBefore: string; lateRiskOnly: boolean; search: string }

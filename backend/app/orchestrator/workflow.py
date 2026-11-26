@@ -11,10 +11,37 @@ from app.core.audit import write_audit
 from app.core.config import settings
 from app.core.db import session_scope
 from app.messaging import publish_task
-from app.models import AgentMessage, Approval, MachineEvent, Order, ScheduleSlot, User, WorkflowRun
+from app.models import (
+    CLOSED_ORDER_STATES,
+    AgentMessage,
+    Approval,
+    MachineEvent,
+    Order,
+    ScheduleSlot,
+    User,
+    WorkflowRun,
+)
 from app.schemas.contracts import ACTIONS, EVENTS
 
+from .cleanup import release_order_resources
 from .outbox import emit, notify
+
+# Orders that are being made or are finished. A revised or duplicate PO never releases these
+# automatically; sales and the manager decide.
+PRODUCTION_STATES = ("IN_PRODUCTION", "COMPLETED")
+
+# How long each task may take before the orchestrator gives up and sends it again.
+# A retry while the first attempt still runs wastes AI calls, so these are generous.
+TASK_TIMEOUT_SECONDS = {
+    "extract_document": 300,
+    "plan_order": 240,
+    "replan_for_machine": 600,
+    "draft_customer_reply": 180,
+}
+
+
+def task_timeout(action):
+    return max(TASK_TIMEOUT_SECONDS.get(action, 0), settings.task_default_timeout_seconds)
 
 
 async def roles(session, *names):
@@ -41,6 +68,8 @@ async def transition(session, order, run, state):
     )
     audit.created_at = datetime.now(UTC)
     emit(session, "event.order.state_changed", dict(order_id=order.id, from_state=previous, to_state=state))
+    if state in CLOSED_ORDER_STATES:
+        await release_order_resources(session, order.id, state)
 
 
 def update(run, **values):
@@ -121,6 +150,8 @@ async def release(session, order, run, purpose):
 
 
 async def fail(session, order, run, error):
+    # Keep the failed task so a manager can retry it. Holds and slots stay until a retry or cancel.
+    update(run, failed_task=run.attempts.get("task"), failed_from=run.state)
     clear(run)
     run.last_error = error
     await transition(session, order, run, "FAILED")
@@ -132,6 +163,45 @@ async def fail(session, order, run, error):
         error,
         f"/orders/{order.id}",
     )
+
+
+async def cancel(session, order, run, reason):
+    """Stop the order and free its holds, machine time and draft purchase requests."""
+    await cancel_approval(session, order.id)
+    clear(run)
+    update(run, cancel_reason=reason)
+    await transition(session, order, run, "CANCELLED")
+    notify(
+        session,
+        await roles(session, "sales", "manager", "planner"),
+        "order_cancelled",
+        f"{order.order_number} was cancelled",
+        reason,
+        f"/orders/{order.id}",
+    )
+
+
+async def retry_failed(session, order, run):
+    """Send the task that failed again, from the state the order was in."""
+    task = (run.attempts or {}).get("failed_task")
+    if run.state != "FAILED" or not task:
+        raise ValueError("Only a failed order with a recorded task can be retried")
+    run.last_error = None
+    await transition(session, order, run, run.attempts.get("failed_from") or "RECEIVED")
+    update(run, failed_task=None, failed_from=None)
+    schedule(run, task["agent"], task["action"], **task["payload"])
+
+
+async def customer_answer(session, order, run, accepted, comment=None):
+    """The customer answered a counter-offer. Accepted: confirm the offered plan. Rejected: cancel."""
+    if run.state != "WAITING_CUSTOMER":
+        raise ValueError("This order is not waiting for a customer answer")
+    update(run, counter_offer=False)
+    if accepted:
+        await transition(session, order, run, "RECHECKING")
+        order_task(run, "material", "recheck_holds")
+    else:
+        await cancel(session, order, run, comment or "The customer rejected the counter-offer.")
 
 
 async def apply_decision(session, order, run, approval):
@@ -146,6 +216,8 @@ async def apply_decision(session, order, run, approval):
         await transition(session, order, run, "RECHECKING")
         order_task(run, "material", "recheck_holds")
     elif approval.reject_reason == "counter_offer":
+        # The plan is locked only after the customer accepts the new date (customer_answer).
+        update(run, counter_offer=True)
         order_task(run, "order", "draft_customer_reply", plan_option_id=approval.chosen_option_id)
     else:
         update(run, changes=[approval.comment or "Manager requested a new plan."])
@@ -204,7 +276,9 @@ async def apply_result(session, order, run, action, data):
     elif action == "create_qc_plan":
         order_task(run, "order", "draft_customer_reply", plan_option_id=selected)
     elif action == "draft_customer_reply":
-        if run.state != "DECLINED":
+        if meta.get("counter_offer"):
+            await transition(session, order, run, "WAITING_CUSTOMER")
+        elif run.state != "DECLINED":
             await transition(session, order, run, "REPLY_DRAFTED")
         notify(
             session,
@@ -270,10 +344,16 @@ async def dispatch(session, order, run, now):
     )
     if previous:
         run.pending_message_id = previous.message_id
-        run.next_timeout_at = previous.sent_at + timedelta(seconds=settings.task_default_timeout_seconds)
+        run.next_timeout_at = previous.sent_at + timedelta(seconds=task_timeout(task["action"]))
         return
     sent = await publish_task(
-        task["agent"], task["action"], order.id, task["payload"], key, attempt=task["attempt"]
+        task["agent"],
+        task["action"],
+        order.id,
+        task["payload"],
+        key,
+        attempt=task["attempt"],
+        timeout_seconds=task_timeout(task["action"]),
     )
     run.pending_message_id, run.next_timeout_at = sent.message_id, sent.reply_by
 
@@ -290,7 +370,7 @@ async def handle_order_message(message):
     async with session_scope() as session:
         if message.action == "event.order.revised" and message.type == "event":
             previous = await lock_order(session, data.previous_order_id)
-            if previous:
+            if previous and previous.status not in PRODUCTION_STATES + CLOSED_ORDER_STATES:
                 run = await find_run(session, previous.id)
                 if run is None:
                     run = WorkflowRun(order_id=previous.id, state=previous.status, attempts={})
@@ -347,7 +427,11 @@ async def handle_order_message(message):
                 if recorded is None:
                     return
             if message.status == "failed":
-                if not retry(run):
+                if (message.payload or {}).get("retryable") is False:
+                    # The agent already knows a retry cannot succeed (bad data, not a network error).
+                    error = message.payload.get("error") or "permanent error"
+                    await fail(session, order, run, f"{message.action} failed: {error}")
+                elif not retry(run):
                     await fail(
                         session, order, run, f"{message.action} failed after {task['attempt']} attempts"
                     )

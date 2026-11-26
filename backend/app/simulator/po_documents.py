@@ -85,6 +85,37 @@ def make_purchase_order(
     return order
 
 
+def demo_extraction(order: DemoPurchaseOrder) -> dict:
+    """What a perfect reader would extract from this PO, in the order agent's extraction format.
+    In demo mode the simulator sends this with the email so demo POs cost no AI calls.
+    An unclear (US-style) date gets low confidence, like a careful reader would give it."""
+
+    def field(value, source=None, confidence=0.98):
+        text = None if value is None else str(value)
+        return {"value": text, "confidence": confidence, "source_text": source or text}
+
+    return {
+        "customer_name": field(order.customer_name),
+        "po_number": field(order.po_number),
+        "po_revision": field(None),
+        "due_date": field(
+            order.due_date.isoformat(),
+            order.due_date_text,
+            0.6 if "unclear_date" in order.mistakes else 0.98,
+        ),
+        "delivery_address": field(order.customer_address or None),
+        "notes": field(None),
+        "lines": [
+            {
+                "part_number": field(order.part_number),
+                "revision": field(order.revision),
+                "quantity": field(order.quantity),
+                "unit_price": field(f"{order.unit_price:.2f}"),
+            }
+        ],
+    }
+
+
 def render_pdf(order: DemoPurchaseOrder) -> bytes:
     buffer = io.BytesIO()
     page = canvas.Canvas(buffer, pagesize=A4)

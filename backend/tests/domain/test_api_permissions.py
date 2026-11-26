@@ -3,7 +3,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from app.models import AuditLog, CustomerMessage
+from app.models import AuditLog, CustomerMessage, WorkflowRun
 
 
 async def test_order_permissions_and_upload(
@@ -35,6 +35,7 @@ async def test_order_permissions_and_upload(
 
     order = await make_order(status="REPLY_DRAFTED", due_date=date(2020, 1, 1))
     db_session.add(CustomerMessage(order_id=order.id, subject="Reply", draft_text="A draft."))
+    db_session.add(WorkflowRun(order_id=order.id, state="REPLY_DRAFTED", attempts={}))
     await db_session.commit()
     details = await client.get(f"/api/orders/{order.id}", headers=store)
     assert details.json()["lines"][0]["unit_price"] is None

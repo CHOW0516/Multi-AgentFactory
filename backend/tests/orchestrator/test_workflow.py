@@ -166,8 +166,18 @@ async def test_rejections(reason, db_session, fake_broker, client, auth_headers)
         draft = tasks(fake_broker, "draft_customer_reply")[-1]
         assert draft.payload["plan_option_id"] == (str(option.id) if reason == "counter_offer" else None)
         assert await state(db_session, order) == (
-            "REPLY_DRAFTED" if reason == "counter_offer" else "DECLINED"
+            "WAITING_CUSTOMER" if reason == "counter_offer" else "DECLINED"
         )
+    if reason == "counter_offer":
+        # The plan is locked only when the customer accepts the later date.
+        sales = auth_headers("sales")
+        accepted = await client.post(
+            f"/api/orders/{order.id}/customer-answer", headers=sales, json={"accepted": True}
+        )
+        assert accepted.status_code == 200, accepted.text
+        assert await state(db_session, order) == "RECHECKING"
+        await workflow.tick()
+        assert tasks(fake_broker, "recheck_holds")
 
 
 async def test_invalid_recheck_replans(db_session, fake_broker, client, auth_headers):

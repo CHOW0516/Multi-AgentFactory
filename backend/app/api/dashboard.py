@@ -97,7 +97,7 @@ async def shortages(session):
             AgentMessage.action == "check_and_hold",
             AgentMessage.message_type == "result",
             AgentMessage.status.in_(("ok", "partial")),
-            Order.status.not_in(("COMPLETED", "DECLINED", "REJECTED", "FAILED")),
+            Order.status.not_in(("COMPLETED", "DECLINED", "REJECTED", "FAILED", "CANCELLED")),
         )
         .ext(distinct_on(AgentMessage.order_id))
         .order_by(AgentMessage.order_id, AgentMessage.sent_at.desc())

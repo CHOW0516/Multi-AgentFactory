@@ -20,7 +20,7 @@ class Catalog:
 @pytest.fixture
 async def catalog(db_session, monkeypatch, tmp_path):
     monkeypatch.setattr(get_settings(), "document_storage_path", str(tmp_path))
-    customer = Customer(code="ACME", name="Acme Industries")
+    customer = Customer(code="ACME", name="Acme Industries", email="purchasing@example.test")
     material = Material(code="AL-01", name="Aluminium", unit="kg", unit_cost=Decimal("3"))
     db_session.add_all([customer, material])
     await db_session.flush()

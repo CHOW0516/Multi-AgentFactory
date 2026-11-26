@@ -1,6 +1,9 @@
 """Extract grounded fields and reconcile them with the factory's catalog."""
 
 import asyncio
+import hashlib
+import json
+import logging
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -13,6 +16,7 @@ from docx.table import Table
 from openpyxl import load_workbook
 from PIL import Image, ImageSequence
 from pydantic import BaseModel, ConfigDict, field_validator
+from pypdf import PdfReader
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,10 +24,13 @@ from app.agents.order.events import flush_events, stage_event
 from app.agents.order.intake import document_path
 from app.api.settings import effective_settings
 from app.core.audit import write_audit
+from app.core.config import settings
 from app.core.db import session_scope
 from app.llm.client import call_ai, document_block, image_block
 from app.models import AuditLog, Customer, ExtractedField, Order, OrderLine, Part, Quotation, SourceDocument
 from app.schemas.contracts import ExtractDocumentResult, QuotationMismatch
+
+logger = logging.getLogger(__name__)
 
 
 class ExtractionModel(BaseModel):
@@ -76,7 +83,25 @@ FIELD_LENGTHS = {
     "part_number": 80,
     "revision": 10,
 }
-PREVIOUSLY_CONFIRMED = {"CONFIRMED", "REPLY_DRAFTED", "CUSTOMER_REPLIED", "IN_PRODUCTION", "COMPLETED"}
+# Earlier orders that a new PO cannot duplicate or revise.
+IGNORED_PREVIOUS = ("CANCELLED", "REJECTED", "DECLINED", "SENDER_REVIEW")
+PROTECTED_FROM_REVISION = ("IN_PRODUCTION", "COMPLETED")
+
+
+# A PDF with less text than this is treated as a scan and sent as an image.
+MIN_PDF_TEXT_CHARS = 80
+
+
+def pdf_text(data: bytes) -> str:
+    """The PDF's own text layer, keeping the column layout. Empty for scans or unreadable files."""
+    try:
+        reader = PdfReader(BytesIO(data))
+        pages = [page.extract_text(extraction_mode="layout") or "" for page in reader.pages]
+    except Exception:  # a damaged or encrypted PDF: fall back to sending it as an image
+        logger.info("Could not read the PDF text layer; sending the PDF as an image")
+        return ""
+    lines = [re.sub(r" {3,}", "   ", line.rstrip()) for page in pages for line in page.splitlines()]
+    return "\n".join(line for line in lines if line.strip())
 
 
 def input_blocks(document: SourceDocument) -> list[dict]:
@@ -84,6 +109,11 @@ def input_blocks(document: SourceDocument) -> list[dict]:
     data = path.read_bytes()
     mime = document.mime_type
     if mime == "application/pdf":
+        # Most emailed POs come from an ERP and carry a text layer. Text costs far fewer tokens than
+        # an image, can go to a cheaper model, and lets check_against_document verify the values.
+        text_layer = pdf_text(data)
+        if len(text_layer) >= MIN_PDF_TEXT_CHARS:
+            return [{"type": "text", "text": "Purchase order (text layer of a PDF):\n" + text_layer}]
         return [document_block(data)]
     if mime == "image/tiff":
         blocks = []
@@ -135,6 +165,55 @@ def field_rows(order_id: UUID, extraction: PurchaseOrder) -> list[ExtractedField
         )
         for name, value in fields
     ]
+
+
+def compact(value: str) -> str:
+    return "".join(value.split()).casefold()
+
+
+# Fields whose value must be copied from the document as written.
+LITERAL_FIELDS = re.compile(r"^(po_number|lines\[\d+\]\.part_number)$")
+# Numbers may be reformatted ("25" in a cell, "25.00" extracted), so compare them as numbers.
+NUMERIC_FIELDS = re.compile(r"^lines\[\d+\]\.(quantity|unit_price)$")
+NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+
+def numbers_in(text_value: str) -> set[Decimal]:
+    found = set()
+    for token in NUMBER.findall(text_value):
+        try:
+            found.add(Decimal(token.replace(",", "")))
+        except InvalidOperation:
+            continue
+    return found
+
+
+def check_against_document(rows: list[ExtractedField], blocks: list[dict]) -> None:
+    """The model's own confidence is not reliable. When we have the document's text (Word, Excel,
+    email body), check that values and quoted source text really appear in it; flag the field for
+    sales if not. PDFs and images have no text here, so they rely on the other checks only."""
+    texts = [block["text"] for block in blocks if block.get("type") == "text"]
+    if not texts:
+        return
+    raw_text = "\n".join(texts)
+    document_text = compact(raw_text)
+    document_numbers = numbers_in(raw_text)
+    for row in rows:
+        problem = None
+        if row.value and NUMERIC_FIELDS.match(row.field_name):
+            try:
+                if Decimal(row.value.replace(",", "")) not in document_numbers:
+                    problem = "Number was not found in the document"
+            except InvalidOperation:
+                problem = "Value is not a number"
+        elif row.value and LITERAL_FIELDS.match(row.field_name):
+            if compact(row.value) not in document_text:
+                problem = "Value was not found in the document"
+        elif row.source_text and compact(row.source_text) not in document_text:
+            problem = "Quoted source text was not found in the document"
+        if problem:
+            row.needs_check = True
+            row.check_reason = problem
 
 
 def same_value(left: str, right: str) -> bool:
@@ -343,66 +422,165 @@ async def reconcile(
     return Reconciliation(lines, blocking, mismatches)
 
 
-async def find_previous_order(session: AsyncSession, order: Order) -> UUID | None:
+@dataclass
+class PreviousOrder:
+    """How this PO relates to an earlier order with the same customer and PO number."""
+
+    kind: str  # "duplicate" | "revision" | "protected_revision"
+    order: Order
+
+
+def same_revision(left: str | None, right: str | None) -> bool:
+    return (left or "").strip().casefold() == (right or "").strip().casefold()
+
+
+async def find_previous(session: AsyncSession, order: Order) -> PreviousOrder | None:
+    """Same PO number and same PO revision is a resend (duplicate), whatever state the first order is in.
+    A different revision replaces the earlier order, unless that order is already in production or done."""
     if order.customer_id is None or order.po_number is None:
         return None
-    return await session.scalar(
-        select(Order.id)
+    previous = await session.scalar(
+        select(Order)
         .where(
             Order.customer_id == order.customer_id,
             func.lower(func.trim(Order.po_number)) == order.po_number.lower(),
             Order.id != order.id,
-            Order.status.in_(PREVIOUSLY_CONFIRMED),
+            Order.status.not_in(IGNORED_PREVIOUS),
         )
         .order_by(Order.created_at.desc(), Order.id)
         .limit(1)
     )
+    if previous is None:
+        return None
+    if same_revision(previous.po_revision, order.po_revision):
+        return PreviousOrder("duplicate", previous)
+    if previous.status in PROTECTED_FROM_REVISION:
+        return PreviousOrder("protected_revision", previous)
+    return PreviousOrder("revision", previous)
+
+
+async def link_previous(
+    session: AsyncSession, order: Order, rows: list[ExtractedField] | None = None
+) -> None:
+    """Revision: stage event.order.revised so the old order is released. Duplicate or a revision of
+    an order in production: flag the PO number for sales (only during extraction, when rows are given)."""
+    found = await find_previous(session, order)
+    order.previous_order_id = None
+    if found is None:
+        return
+    if found.kind == "revision":
+        order.previous_order_id = found.order.id
+        await stage_event(
+            session, order.id, "event.order.revised", from_agent="order", previous_order_id=found.order.id
+        )
+        return
+    if rows is None:
+        return  # sales has already reviewed and confirmed this order as a new one
+    reason = (
+        f"Possible duplicate of {found.order.order_number} (same PO number and revision)"
+        if found.kind == "duplicate"
+        else f"Revision of {found.order.order_number}, which is already {found.order.status}; "
+        "change that order by hand"
+    )
+    for row in rows:
+        if row.field_name == "po_number":
+            row.needs_check = True
+            row.check_reason = "; ".join(filter(None, [row.check_reason, reason]))[:200]
+
+
+async def cached_extraction(session: AsyncSession, order_id: UUID) -> ExtractDocumentResult | None:
+    previous = await session.scalar(
+        select(AuditLog)
+        .where(
+            AuditLog.agent == "order",
+            AuditLog.action == "extract_document",
+            AuditLog.entity_id == str(order_id),
+        )
+        .limit(1)
+    )
+    return ExtractDocumentResult.model_validate(previous.after["result"]) if previous else None
+
+
+async def lock_document(session: AsyncSession, document_id: UUID) -> tuple[SourceDocument, Order]:
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+        {"key": f"order.extract:{document_id}"},
+    )
+    document = await session.get(SourceDocument, document_id)
+    order = await session.scalar(select(Order).where(Order.source_document_id == document_id))
+    if document is None or order is None:
+        raise ValueError("Order document not found")
+    return document, order
+
+
+def demo_data_path(document: SourceDocument):
+    """Simulator POs carry the values printed on them in this side file (demo mode only)."""
+    return document_path(f"{document.file_path}.demo.json")
+
+
+async def earlier_extraction(session: AsyncSession, digest: str) -> PurchaseOrder | None:
+    """The same file was read before (a resent PO): reuse that reading instead of paying again."""
+    entry = await session.scalar(
+        select(AuditLog)
+        .where(
+            AuditLog.agent == "order",
+            AuditLog.action == "extract_document",
+            AuditLog.after["sha256"].as_string() == digest,
+        )
+        .order_by(AuditLog.created_at.desc())
+        .limit(1)
+    )
+    if entry is None or "raw" not in entry.after:
+        return None
+    return PurchaseOrder.model_validate(entry.after["raw"])
+
+
+async def read_purchase_order(document: SourceDocument, order_id: UUID, blocks: list[dict], digest: str):
+    """Returns the extraction and where it came from: 'demo', 'reused' or 'ai'."""
+    sidecar = demo_data_path(document)
+    if settings.is_demo and sidecar.is_file():
+        return PurchaseOrder.model_validate(json.loads(sidecar.read_text())), "demo"
+    async with session_scope() as session:
+        reused = await earlier_extraction(session, digest)
+    if reused is not None:
+        return reused, "reused"
+    response = await call_ai(
+        "order",
+        "extraction",
+        [{"role": "user", "content": blocks}],
+        system=SYSTEM_PROMPT + "\nReply with one JSON object that matches the given schema and nothing else.",
+        response_schema=PurchaseOrder.model_json_schema(),
+        order_id=order_id,
+    )
+    return PurchaseOrder.model_validate(response.data), "ai"
 
 
 async def extract_document(document_id: UUID) -> ExtractDocumentResult:
+    # Step 1: a short transaction to find the order and reuse an earlier result.
     async with session_scope() as session:
-        await session.execute(
-            text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
-            {"key": f"order.extract:{document_id}"},
-        )
-        document = await session.get(SourceDocument, document_id)
-        order = await session.scalar(select(Order).where(Order.source_document_id == document_id))
-        if document is None or order is None:
-            raise ValueError("Order document not found")
-        previous = await session.scalar(
-            select(AuditLog)
-            .where(
-                AuditLog.agent == "order",
-                AuditLog.action == "extract_document",
-                AuditLog.entity_id == str(order.id),
-            )
-            .limit(1)
-        )
-        if previous is not None:
-            result = ExtractDocumentResult.model_validate(previous.after["result"])
-        else:
-            blocks = await asyncio.to_thread(input_blocks, document)
-            response = await call_ai(
-                "order",
-                "extraction",
-                [{"role": "user", "content": blocks}],
-                system=SYSTEM_PROMPT
-                + "\nReply with one JSON object that matches the given schema and nothing else.",
-                response_schema=PurchaseOrder.model_json_schema(),
-                order_id=order.id,
-            )
-            rows = field_rows(order.id, PurchaseOrder.model_validate(response.data))
+        document, order = await lock_document(session, document_id)
+        result = await cached_extraction(session, order.id)
+        order_id = order.id
+    if result is not None:
+        return result
+
+    # Step 2: read the PO (AI call, demo data or an earlier reading of the same file),
+    # with no database transaction or lock held.
+    data = await asyncio.to_thread(document_path(document.file_path).read_bytes)
+    digest = hashlib.sha256(data).hexdigest()
+    blocks = await asyncio.to_thread(input_blocks, document)
+    extraction, source = await read_purchase_order(document, order_id, blocks, digest)
+
+    # Step 3: save. Another worker may have finished first; then its result wins.
+    async with session_scope() as session:
+        document, order = await lock_document(session, document_id)
+        result = await cached_extraction(session, order.id)
+        if result is None:
+            rows = field_rows(order.id, extraction)
+            check_against_document(rows, blocks)
             reconciled = await reconcile(session, order, rows)
             session.add_all(rows + reconciled.lines)
-            order.previous_order_id = await find_previous_order(session, order)
-            if order.previous_order_id:
-                await stage_event(
-                    session,
-                    order.id,
-                    "event.order.revised",
-                    from_agent="order",
-                    previous_order_id=order.previous_order_id,
-                )
+            await link_previous(session, order, rows)
             result = ExtractDocumentResult(
                 order_id=order.id,
                 fields_needing_check=[row.field_name for row in rows if row.needs_check],
@@ -415,7 +593,12 @@ async def extract_document(document_id: UUID) -> ExtractDocumentResult:
                 "orders",
                 order.id,
                 None,
-                {"result": result.model_dump(mode="json")},
+                {
+                    "result": result.model_dump(mode="json"),
+                    "raw": extraction.model_dump(mode="json"),
+                    "sha256": digest,
+                    "source": source,
+                },
             )
-    await flush_events(order.id)
+    await flush_events(order_id)
     return result

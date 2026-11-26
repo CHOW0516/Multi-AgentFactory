@@ -18,8 +18,8 @@ from app.agents.planning.solver import Job
 from app.api.settings import effective_settings
 from app.core.audit import write_audit
 from app.core.config import settings
-from app.llm.client import DailyCostLimitReached, LlmRefused, LlmUnavailable, call_ai
 from app.models import (
+    CLOSED_ORDER_STATES,
     AuditLog,
     Holiday,
     Machine,
@@ -173,13 +173,13 @@ def skipped_text(reasons: dict[str, str]) -> str:
     )
 
 
-async def explain(
+def explanation_parts(
     candidate: Candidate,
-    order: Order,
     margin: Decimal,
     missing_costs: list[str],
     reasons: dict[str, str],
-) -> str:
+) -> tuple[str, str]:
+    """The delivery sentence and the computed details that follow the option sentence."""
     ready = f"The full order can ship by {candidate.finish_date:%d %B %Y}."
     if candidate.first_finish and candidate.first_quantity is not None:
         ready = (
@@ -198,41 +198,27 @@ async def explain(
         detail.append("Material cost was estimated as zero for " + ", ".join(missing_costs) + ".")
     if not candidate.optimal:
         detail.append("The solver returned a feasible schedule before it could establish optimality.")
+    tail = (" " + " ".join(detail) if detail else "") + skipped_text(reasons)
+    return ready, tail
 
-    facts = {
-        "option": candidate.kind,
-        "delivery": ready,
-        "overtime_hours": str(candidate.overtime_seconds / HOUR),
-        "extra_cost": str(candidate.extra_cost),
-        "margin": str(margin),
-        "machine_load": candidate.load,
-        "impacted_orders": [
-            {key: value for key, value in row.items() if key != "source_slots"} for row in candidate.impacted
-        ],
-        "skipped": reasons,
-    }
-    wording = ""
-    try:
-        result = await call_ai(
-            "planning",
-            "explain",
-            [{"role": "user", "content": str(facts)}],
-            system=(
-                "Explain this production option in one short sentence based only on the supplied facts. "
-                "Do not quote any numbers or dates; the system inserts those separately."
-            ),
-            order_id=order.id,
-        )
-        line = result.text.strip()
-        if line and len(line) <= 300 and "\n" not in line and not any(char.isdigit() for char in line):
-            wording = " " + line
-    except (LlmUnavailable, DailyCostLimitReached, LlmRefused):
-        logger.info("Using computed explanation for %s option on order %s", candidate.kind, order.id)
 
-    explanation = ready + wording
-    if detail:
-        explanation += " " + " ".join(detail)
-    return explanation + skipped_text(reasons)
+# One plain sentence per option type. These replaced an AI call per option: the AI was not allowed
+# to use numbers or dates, so it only reworded what these sentences say, at a cost on every plan.
+OPTION_SENTENCES = {
+    "as_requested": "This plan meets the requested date with normal shifts.",
+    "delay": "This is the earliest date the current machine time and material allow.",
+    "split": "This plan ships part of the order early and the rest later.",
+    "overtime": "This plan meets the date by adding overtime.",
+    "move_other_order": "This plan meets the date by moving other orders later.",
+}
+
+
+def explanation_text(
+    candidate: Candidate, margin: Decimal, missing_costs: list[str], reasons: dict[str, str]
+) -> str:
+    ready, tail = explanation_parts(candidate, margin, missing_costs, reasons)
+    sentence = OPTION_SENTENCES.get(candidate.kind)
+    return ready + (" " + sentence if sentence else "") + tail
 
 
 async def clear_proposals(session: AsyncSession, order_id: UUID, option_id: UUID | None = None) -> None:
@@ -267,6 +253,8 @@ async def plan_order(
     order = await session.get(Order, order_id)
     if order is None:
         raise ValueError("Order not found")
+    if order.status in CLOSED_ORDER_STATES:
+        raise ValueError(f"Order is {order.status}; it is not planned")
     lines = list(
         await session.scalars(
             select(OrderLine)
@@ -305,10 +293,11 @@ async def plan_order(
             margin=margin,
             machine_load=candidate.load,
             impacted_orders=candidate.impacted,
-            explanation=await explain(candidate, order, margin, missing_costs, reasons),
+            explanation=None,
             is_recommended=candidate.recommended,
             status="proposed",
         )
+        option.explanation = explanation_text(candidate, margin, missing_costs, reasons)
         session.add(option)
         await session.flush()
         displaced = {
@@ -488,6 +477,9 @@ async def lock_plan(session: AsyncSession, order_id: UUID, option_id: UUID | Non
     option = await session.get(PlanOption, option_id) if option_id else None
     if option is None or option.order_id != order_id:
         raise ValueError("Selected plan option was not found")
+    target = await session.get(Order, order_id)
+    if target is None or target.status in CLOSED_ORDER_STATES:
+        raise ValueError("The order is closed; its plan cannot be locked")
     if option.status == "chosen":
         return
     slots = await option_slots(session, option.id)

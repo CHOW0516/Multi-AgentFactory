@@ -19,7 +19,6 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
@@ -33,7 +32,6 @@ from app.agents.planning import service as planning
 from app.core.audit import write_audit
 from app.core.config import settings
 from app.core.db import session_scope
-from app.llm.client import LlmUnavailable
 from app.models import (
     Approval,
     BomLine,
@@ -64,10 +62,6 @@ from app.simulator.po_documents import DemoPurchaseOrder, render_pdf
 logger = logging.getLogger(__name__)
 
 SCENARIO_PO_PREFIX = "TEST"
-
-
-async def _no_ai(*_args, **_kwargs):
-    raise LlmUnavailable("The AI is not used while seeding test scenarios")
 
 
 @dataclass
@@ -564,34 +558,30 @@ async def _main_material(session, part: Part) -> Material:
 async def add_scenarios() -> dict[str, str]:
     """Adds the test scenarios. Needs the demo seed first. Returns {scenario: order number}."""
     created: dict[str, str] = {}
-    with (
-        patch("app.agents.planning.service.call_ai", _no_ai),
-        patch("app.agents.order.customer.call_ai", _no_ai),
-    ):
-        async with session_scope() as session:
-            if await session.scalar(select(func.count()).select_from(Part)) == 0:
-                raise RuntimeError("Run the demo seed first: python -m app.simulator seed --reset")
-            if await session.scalar(select(Order.id).where(Order.order_number.like("%-T001")).limit(1)):
-                raise RuntimeError(
-                    "Test scenarios already exist. Use seed --reset --scenarios to start again."
-                )
-            ctx = Context(
-                session=session,
-                now=datetime.now(UTC),
-                zone=ZoneInfo(settings.app_timezone),
-                machines={machine.code: machine for machine in await session.scalars(select(Machine))},
-                users={
-                    user.email.split("@")[0]: user
-                    for user in await session.scalars(select(User).where(User.email.like("%@factory.local")))
-                },
+    async with session_scope() as session:
+        if await session.scalar(select(func.count()).select_from(Part)) == 0:
+            raise RuntimeError("Run the demo seed first: python -m app.simulator seed --reset")
+        if await session.scalar(select(Order.id).where(Order.order_number.like("%-T001")).limit(1)):
+            raise RuntimeError(
+                "Test scenarios already exist. Use seed --reset --scenarios to start again."
             )
-            picker = PartPicker(await _parts_by_kind(session))
-            await _machines(ctx)
-            created |= await _running(ctx, picker)
-            await session.flush()
-            created |= await _approvals(ctx, picker)
-            created |= await _early_states(ctx, picker)
-            await _materials_and_quotes(ctx, picker)
+        ctx = Context(
+            session=session,
+            now=datetime.now(UTC),
+            zone=ZoneInfo(settings.app_timezone),
+            machines={machine.code: machine for machine in await session.scalars(select(Machine))},
+            users={
+                user.email.split("@")[0]: user
+                for user in await session.scalars(select(User).where(User.email.like("%@factory.local")))
+            },
+        )
+        picker = PartPicker(await _parts_by_kind(session))
+        await _machines(ctx)
+        created |= await _running(ctx, picker)
+        await session.flush()
+        created |= await _approvals(ctx, picker)
+        created |= await _early_states(ctx, picker)
+        await _materials_and_quotes(ctx, picker)
     logger.info("Test scenarios added: %s", created)
     return created
 

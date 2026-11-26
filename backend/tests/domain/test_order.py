@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from app.agents.order import events, mail
 from app.agents.order.customer import close_order, draft_customer_reply
-from app.agents.order.extraction import extract_document
+from app.agents.order.extraction import MIN_PDF_TEXT_CHARS, extract_document, pdf_text
 from app.agents.order.intake import Attachment, store_documents
 from app.core.config import settings
 from app.models import (
@@ -62,7 +62,9 @@ async def test_extract_fixture(fixture, catalog, fake_ai, fake_broker, db_sessio
     req = fake_ai.requests[0]
     assert req["messages"][0]["role"] == "system"
     blocks = req["messages"][1]["content"]
-    expected_type = {".pdf": "image_url", ".png": "image_url"}.get(fixture.suffix, "text")
+    # PDFs with a text layer are sent as text (cheaper); scans and images are sent as images.
+    has_text = fixture.suffix == ".pdf" and len(pdf_text(fixture.read_bytes())) >= MIN_PDF_TEXT_CHARS
+    expected_type = "text" if has_text or fixture.suffix not in {".pdf", ".png"} else "image_url"
     assert blocks[0]["type"] == expected_type
     if expected_type == "text":
         assert "PX-14" in blocks[0]["text"]
@@ -174,7 +176,7 @@ async def test_imap_skips_duplicate_message_id(catalog, monkeypatch, db_session,
 async def test_email_retries_after_commit_without_a_second_order(
     catalog, monkeypatch, db_session, fake_broker
 ):
-    metadata, files = mail.message_parts(sample_email())
+    metadata, files, _ = mail.message_parts(sample_email())
     real_publish = events.publish_event
 
     async def unavailable(*args, **kwargs):
@@ -202,10 +204,10 @@ async def test_split_draft_and_close_use_database_facts(
     )
     db_session.add(proposal)
     await db_session.flush()
-    fake_ai.add_response(text="Thank you for your order.")
     drafted = await draft_customer_reply(db_session, order.id, proposal.id)
     saved = await db_session.get(CustomerMessage, drafted.customer_message_id)
     assert saved.status == "draft"
+    assert fake_ai.requests == []  # the opening is a fixed sentence, not an AI call
     assert "6 by 10 February 2027" in saved.draft_text
     assert "4 by 12 February 2027" in saved.draft_text
     assert await draft_customer_reply(db_session, order.id, proposal.id) == drafted

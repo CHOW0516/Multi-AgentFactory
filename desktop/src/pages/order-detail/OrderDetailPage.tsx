@@ -14,6 +14,7 @@ import { QueryState } from "../../components/QueryState";
 import { useCanSeePrices, useHasRole } from "../../components/roles";
 import { OrderStatusBadge } from "../../components/StatusBadge";
 import { FieldCheck } from "./FieldCheck";
+import { OrderActions } from "./OrderActions";
 import { Timeline } from "./Timeline";
 
 export function OrderDetailPage() {
@@ -61,6 +62,7 @@ export function OrderDetailPage() {
               subtitle={<>{order.customer_name} · PO {order.po_number ?? "—"} · due {formatDate(order.due_date)}{order.promised_date ? ` · promised ${formatDate(order.promised_date)}` : ""}</>}
               actions={<>
                 <OrderStatusBadge state={order.status} testId="order-status" />
+                <OrderActions order={order} />
                 <button type="button" className="button" onClick={() => openChat({ id: order.id, label: order.order_number })}>Ask orchestrator</button>
               </>} />
 

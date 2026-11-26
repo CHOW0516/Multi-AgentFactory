@@ -2,8 +2,10 @@ import type { MachineStatus, OrderState } from "../api/types";
 import { statusColor } from "../theme/theme-store";
 import { stateLabel } from "./format";
 
-const NEEDS_ACTION: OrderState[] = ["NEEDS_FIELD_CHECK", "WAITING_APPROVAL", "REPLAN_NEEDED", "REPLY_DRAFTED"];
-const PROBLEM: OrderState[] = ["FAILED", "REJECTED", "DECLINED"];
+const NEEDS_ACTION: OrderState[] = [
+  "NEEDS_FIELD_CHECK", "WAITING_APPROVAL", "REPLAN_NEEDED", "REPLY_DRAFTED", "WAITING_CUSTOMER", "SENDER_REVIEW",
+];
+const PROBLEM: OrderState[] = ["FAILED", "REJECTED", "DECLINED", "CANCELLED"];
 const FINISHED: OrderState[] = ["COMPLETED", "CUSTOMER_REPLIED"];
 
 export function orderTone(state: OrderState): "action" | "problem" | "done" | "neutral" {

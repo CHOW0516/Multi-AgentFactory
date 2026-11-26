@@ -14,6 +14,7 @@ from app.api.settings import effective_settings
 from app.core.audit import write_audit
 from app.core.config import settings
 from app.models import (
+    CLOSED_ORDER_STATES,
     AuditLog,
     BomLine,
     Material,
@@ -110,10 +111,13 @@ async def order_holds(session: AsyncSession, order_id: UUID) -> list[StockHold]:
     )
 
 
-async def lock_order(session: AsyncSession, order_id: UUID) -> Order:
-    order = await session.get(Order, order_id, with_for_update=True)
+async def lock_order(session: AsyncSession, order_id: UUID, *, open_only: bool = False) -> Order:
+    order = await session.get(Order, order_id, with_for_update=True, populate_existing=True)
     if order is None:
         raise ValueError("Order not found")
+    if open_only and order.status in CLOSED_ORDER_STATES:
+        # A late task must not reserve stock for an order that was cancelled or closed meanwhile.
+        raise ValueError(f"Order is {order.status}; no stock is reserved for it")
     return order
 
 
@@ -203,7 +207,7 @@ async def forecast(
 async def check_and_hold(
     session: AsyncSession, order_id: UUID, task_id: UUID | None = None
 ) -> CheckAndHoldResult:
-    await lock_order(session, order_id)
+    await lock_order(session, order_id, open_only=True)
     if task_id is not None:
         previous = await session.scalar(
             select(AuditLog)
@@ -320,7 +324,7 @@ async def recheck_holds(session: AsyncSession, order_id: UUID) -> RecheckResult:
 
 
 async def confirm_holds(session: AsyncSession, order_id: UUID) -> None:
-    await lock_order(session, order_id)
+    await lock_order(session, order_id, open_only=True)
     holds = await order_holds(session, order_id)
     needed = await order_requirements(session, order_id)
     await load_materials(session, set(needed) | {hold.material_id for hold in holds}, lock=True)
@@ -382,7 +386,7 @@ async def expire_holds(session: AsyncSession) -> int:
 
 
 async def create_purchase_requests(session: AsyncSession, order_id: UUID) -> CreatePurchaseRequestsResult:
-    order = await lock_order(session, order_id)
+    order = await lock_order(session, order_id, open_only=True)
     report = await forecast(session, await order_requirements(session, order_id), order_id=order_id)
     existing = {
         row.material_id: row

@@ -1,6 +1,8 @@
 """Publish a machine availability change once per maintenance record and window."""
 
-from sqlalchemy import select
+from datetime import UTC, datetime
+
+from sqlalchemy import or_, select
 
 from app.core.audit import write_audit
 from app.core.db import session_scope
@@ -8,12 +10,18 @@ from app.models import AuditLog, MaintenanceEvent
 from app.orchestrator.outbox import emit
 
 
-async def scan():
+async def scan(now=None):
+    now = now or datetime.now(UTC)
     async with session_scope() as session:
         events = (
             await session.scalars(
                 select(MaintenanceEvent)
-                .where(MaintenanceEvent.maintenance_type.in_(("breakdown", "planned")))
+                .where(
+                    MaintenanceEvent.maintenance_type.in_(("breakdown", "planned")),
+                    # Only windows that still affect the future. A breakdown closed in the past
+                    # needs no replan, and skipping old rows keeps the scan cheap.
+                    or_(MaintenanceEvent.end_at.is_(None), MaintenanceEvent.end_at > now),
+                )
                 .order_by(MaintenanceEvent.start_at)
                 .with_for_update(skip_locked=True)
             )

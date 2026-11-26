@@ -129,7 +129,15 @@ async def apply_options(session, job):
     deferred = {}
     for identifier, options in sorted(job.after["options"].items()):
         order = await lock_order(session, uuid.UUID(identifier))
-        if order is None or order.status in ("FAILED", "DECLINED", "COMPLETED", "REJECTED"):
+        if order is None or order.status in (
+            "FAILED",
+            "DECLINED",
+            "COMPLETED",
+            "REJECTED",
+            "CANCELLED",
+            "WAITING_CUSTOMER",
+            "SENDER_REVIEW",
+        ):
             continue
         run = await find_run(session, order.id)
         if run is None:

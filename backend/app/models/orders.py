@@ -28,7 +28,12 @@ ORDER_STATES = (
     "DECLINED",
     "REPLAN_NEEDED",
     "FAILED",
+    "WAITING_CUSTOMER",
+    "CANCELLED",
+    "SENDER_REVIEW",
 )
+# Orders in these states own no stock holds, purchase requests or future machine time.
+CLOSED_ORDER_STATES = ("COMPLETED", "REJECTED", "DECLINED", "CANCELLED")
 FINAL_ORDER_STATES = ("CUSTOMER_REPLIED", "COMPLETED", "DECLINED", "FAILED")
 
 

@@ -6,19 +6,21 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.material.service import material_status
 from app.agents.order.events import flush_events, stage_event
-from app.agents.order.extraction import find_previous_order, reconcile
+from app.agents.order.extraction import link_previous, reconcile
 from app.agents.order.intake import MAX_DOCUMENT_BYTES, Attachment, document_path, store_documents
 from app.api.master_data import get_or_404
 from app.core.audit import write_audit
 from app.core.config import settings
 from app.core.db import get_session
-from app.core.security import current_user
+from app.core.security import current_user, require_roles
 from app.models import (
+    CLOSED_ORDER_STATES,
     AuditLog,
     Customer,
     CustomerMessage,
@@ -28,7 +30,9 @@ from app.models import (
     PlanOption,
     SourceDocument,
     User,
+    WorkflowRun,
 )
+from app.orchestrator import workflow
 from app.schemas.api import (
     CustomerMessageOut,
     ExtractedFieldOut,
@@ -42,7 +46,7 @@ from app.schemas.api import (
 )
 
 router = APIRouter(tags=["orders"])
-CLOSED = ("COMPLETED", "REJECTED", "DECLINED", "FAILED")
+CLOSED = ("COMPLETED", "REJECTED", "DECLINED", "FAILED", "CANCELLED")
 
 
 async def sales_only(user: User = Depends(current_user)) -> User:
@@ -308,15 +312,7 @@ async def confirm_fields(
                     setattr(old, field, getattr(new, field))
         for row in rows:
             row.needs_check = False
-        order.previous_order_id = await find_previous_order(session, order)
-        if order.previous_order_id:
-            await stage_event(
-                session,
-                order.id,
-                "event.order.revised",
-                from_agent="order",
-                previous_order_id=order.previous_order_id,
-            )
+        await link_previous(session, order)
         await stage_event(session, order.id, "event.order.fields_corrected", from_agent="api")
         await write_audit(
             session,
@@ -397,14 +393,18 @@ async def mark_message_sent(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(sales_only),
 ):
-    order = await session.get(Order, order_id, with_for_update={"key_share": True})
+    order = await workflow.lock_order(session, order_id)
     if order is None:
         raise HTTPException(404, "Order not found")
     message = await latest_message(session, order_id)
     if message.status == "draft":
         before = {"status": message.status, "order_status": order.status}
         message.status, message.sent_by, message.sent_at = "sent_by_sales", user.id, datetime.now(UTC)
-        order.status = "CUSTOMER_REPLIED"
+        # Only the workflow changes order status. A confirmation reply moves the order on; a decline or
+        # counter-offer reply does not (the order stays DECLINED or WAITING_CUSTOMER).
+        run = await workflow.find_run(session, order.id)
+        if run is not None and run.state == "REPLY_DRAFTED":
+            await workflow.transition(session, order, run, "CUSTOMER_REPLIED")
         await write_audit(
             session,
             user,
@@ -416,3 +416,110 @@ async def mark_message_sent(
         )
         await session.commit()
     return message
+
+
+class CancelIn(BaseModel):
+    reason: str
+
+
+class CustomerAnswerIn(BaseModel):
+    accepted: bool
+    comment: str | None = None
+
+
+async def locked_run(session: AsyncSession, order_id: UUID) -> tuple[Order, WorkflowRun]:
+    order = await workflow.lock_order(session, order_id)
+    if order is None:
+        raise HTTPException(404, "Order not found")
+    run = await workflow.find_run(session, order.id)
+    if run is None:
+        run = WorkflowRun(order_id=order.id, state=order.status, attempts={})
+        session.add(run)
+    return order, run
+
+
+@router.post("/orders/{order_id}/cancel", response_model=OrderSummary)
+async def cancel_order(
+    order_id: UUID,
+    body: CancelIn,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(require_roles("manager", "sales")),
+):
+    """Stop an order and free its stock holds, machine time and draft purchase requests."""
+    reason = body.reason.strip()
+    if not reason or len(reason) > 500:
+        raise HTTPException(422, "Give a reason of 1 to 500 characters")
+    order, run = await locked_run(session, order_id)
+    if order.status in CLOSED_ORDER_STATES:
+        raise HTTPException(409, f"The order is already {order.status}")
+    if order.status == "IN_PRODUCTION" and user.role != "manager" and user.role != "admin":
+        raise HTTPException(403, "Only a manager can cancel an order in production")
+    await workflow.cancel(session, order, run, reason)
+    await write_audit(session, user, "cancel_order", "orders", order.id, None, {"reason": reason})
+    await session.commit()
+    return summary(order, None, False)
+
+
+@router.post("/orders/{order_id}/retry", response_model=OrderSummary)
+async def retry_order(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(require_roles("manager")),
+):
+    """Run the failed step of a FAILED order again."""
+    order, run = await locked_run(session, order_id)
+    try:
+        await workflow.retry_failed(session, order, run)
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    await write_audit(session, user, "retry_order", "orders", order.id, None, {"state": run.state})
+    await session.commit()
+    return summary(order, None, False)
+
+
+@router.post("/orders/{order_id}/customer-answer", response_model=OrderSummary)
+async def customer_answer(
+    order_id: UUID,
+    body: CustomerAnswerIn,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(sales_only),
+):
+    """Record the customer's answer to a counter-offer (a later delivery date)."""
+    order, run = await locked_run(session, order_id)
+    try:
+        await workflow.customer_answer(session, order, run, body.accepted, body.comment)
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    await write_audit(
+        session,
+        user,
+        "customer_answer",
+        "orders",
+        order.id,
+        None,
+        {"accepted": body.accepted, "comment": body.comment},
+    )
+    await session.commit()
+    return summary(order, None, False)
+
+
+@router.post("/orders/{order_id}/release-intake", response_model=OrderSummary)
+async def release_intake(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(sales_only),
+):
+    """Sales checked a PO email from an unknown sender: let the order agent read it."""
+    order = await workflow.lock_order(session, order_id)
+    if order is None:
+        raise HTTPException(404, "Order not found")
+    if order.status != "SENDER_REVIEW":
+        raise HTTPException(409, "This order is not waiting for a sender check")
+    order.status = "RECEIVED"
+    await stage_event(
+        session, order.id, "event.order.received", from_agent="api", document_id=order.source_document_id
+    )
+    await write_audit(session, user, "release_intake", "orders", order.id, None, {"status": "RECEIVED"})
+    await session.commit()
+    await flush_events(order.id, retry=True)
+    return summary(order, None, False)

@@ -12,7 +12,8 @@ export type MachineStatus = "running" | "idle" | "setup" | "down" | "maintenance
 export type OrderState =
   | "RECEIVED" | "EXTRACTED" | "NEEDS_FIELD_CHECK" | "VERIFIED" | "MATERIAL_CHECKED" | "PLANNED"
   | "WAITING_APPROVAL" | "RECHECKING" | "CONFIRMED" | "REPLY_DRAFTED" | "CUSTOMER_REPLIED"
-  | "IN_PRODUCTION" | "COMPLETED" | "REJECTED" | "DECLINED" | "REPLAN_NEEDED" | "FAILED";
+  | "IN_PRODUCTION" | "COMPLETED" | "REJECTED" | "DECLINED" | "REPLAN_NEEDED" | "FAILED"
+  | "WAITING_CUSTOMER" | "CANCELLED" | "SENDER_REVIEW";
 export type AgentName =
   | "orchestrator" | "order" | "material" | "planning" | "quality" | "monitoring" | "maintenance" | "simulator" | "api";
 
