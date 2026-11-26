@@ -312,3 +312,56 @@ async def test_unknown_material_date_gives_no_promised_option(capacity, make_ord
     order = await make_order(quantity=10, due_date=MONDAY)
     result = await service.plan_order(db_session, order.id, None)
     assert result.recommended_option_id is None
+
+
+async def late_job_setup(capacity, make_order, db_session, late_due):
+    """LATE runs on MILL-01 06:00-08:00 Monday with 2 more parts at 08:00-10:00. NEXT follows at 10:00-12:00."""
+    machine = await capacity()
+    late = await make_order(quantity=4, due_date=late_due, status="IN_PRODUCTION")
+    after = await make_order(quantity=2, due_date=MONDAY, status="CONFIRMED")
+    for order, start, end in ((late, 6, 8), (late, 8, 10), (after, 10, 12)):
+        db_session.add(
+            ScheduleSlot(
+                order_id=order.id,
+                machine_id=machine.id,
+                routing_step=1,
+                quantity=2,
+                start_at=at(MONDAY, start),
+                end_at=at(MONDAY, end),
+                status="locked",
+            )
+        )
+    await db_session.commit()
+    # At the current pace the running job ends at 12:00 instead of 08:00.
+    payload = ReplanForMachinePayload(
+        machine_id=machine.id,
+        unavailable_from=at(MONDAY, 8),
+        unavailable_to=at(MONDAY, 12),
+        late_order_id=late.id,
+    )
+    return late, after, payload
+
+
+async def test_late_job_only_returns_orders_that_miss_their_date(capacity, make_order, db_session):
+    late, after, payload = await late_job_setup(capacity, make_order, db_session, late_due=TUESDAY)
+    result = await service.replan_for_machine(db_session, payload)
+    # LATE still ships Tuesday with normal shifts, so only NEXT needs a decision.
+    assert result.affected_order_ids == [after.id]
+    assert set(result.plan_option_ids_by_order) == {str(after.id)}
+    proposed = await db_session.scalar(
+        select(func.count())
+        .select_from(PlanOption)
+        .where(PlanOption.order_id == late.id, PlanOption.status == "proposed")
+    )
+    assert proposed == 0
+
+
+async def test_late_job_pushes_the_late_orders_own_next_steps(capacity, make_order, db_session):
+    late, _, payload = await late_job_setup(capacity, make_order, db_session, late_due=MONDAY)
+    result = await service.replan_for_machine(db_session, payload)
+    assert late.id in result.affected_order_ids
+    option_ids = result.plan_option_ids_by_order[str(late.id)]
+    kinds = set(await db_session.scalars(select(PlanOption.option_type).where(PlanOption.id.in_(option_ids))))
+    assert option_ids and "as_requested" not in kinds
+    slots = await db_session.scalars(select(ScheduleSlot).where(ScheduleSlot.plan_option_id.in_(option_ids)))
+    assert all(slot.start_at >= at(MONDAY, 12) for slot in slots if slot.order_id == late.id)

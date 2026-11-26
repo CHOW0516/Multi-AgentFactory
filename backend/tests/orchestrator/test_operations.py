@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.agents.maintenance import scan
+from app.agents.monitoring import expected_end
 from app.agents.monitoring import handle as monitor
 from app.agents.quality import create_plan, verify
 from app.api.dashboard import kpi_tiles, local_date
@@ -361,3 +362,14 @@ async def test_simulator_agent_is_available_only_in_demo(client, auth_headers, m
         assert messages.json()["items"][0]["message_id"] == str(event.message_id)
     else:
         assert summary.status_code == messages.status_code == 404
+
+
+def test_expected_end_follows_the_pace_with_a_cap():
+    start = datetime(2027, 1, 4, 8, tzinfo=UTC)
+    slot = ScheduleSlot(quantity=100, start_at=start, end_at=start + timedelta(hours=4))
+    # 40 of 100 after 2 hours: 5 hours at this pace, so one hour late.
+    assert expected_end(slot, 40, start + timedelta(hours=2), 24) == start + timedelta(hours=5)
+    # No parts yet: planned end plus the delay already seen.
+    assert expected_end(slot, 0, start + timedelta(hours=1), 60) == start + timedelta(hours=5)
+    # 1 part after 2 hours would mean 200 hours. Capped at twice the planned time.
+    assert expected_end(slot, 1, start + timedelta(hours=2), 118) == start + timedelta(hours=8)

@@ -108,7 +108,10 @@ async def load_scenario(
             )
         )
     )
-    replaces, remaining, blocked_reason = [], None, None
+    replaces, remaining, blocked_reason, late_until = [], None, None, None
+    if order and outage and outage.late_order_id == order.id:
+        # This order's running job is late: its next steps cannot start before that job ends.
+        late_until = outage.unavailable_to
     if order:
         # Own future slots can be replaced by an approved replan. Active slots retain their capacity.
         replaces = [slot for slot in locked if slot.order_id == order.id and slot.start_at >= now]
@@ -160,6 +163,7 @@ async def load_scenario(
         remaining=remaining,
         blocked_reason=blocked_reason,
         target=order,
+        late_until=late_until,
     )
 
 
@@ -547,6 +551,17 @@ async def release_plan(session: AsyncSession, order_id: UUID, option_id: UUID | 
     )
 
 
+async def late_job_needs_decision(session: AsyncSession, option_ids: list[UUID]) -> bool:
+    """A late job only needs the manager when the order can no longer meet its due date with normal shifts.
+
+    No options means there is no unstarted work to move, so there is nothing to decide either.
+    """
+    if not option_ids:
+        return False
+    kinds = set(await session.scalars(select(PlanOption.option_type).where(PlanOption.id.in_(option_ids))))
+    return "as_requested" not in kinds
+
+
 async def replan_for_machine(
     session: AsyncSession,
     payload: ReplanForMachinePayload,
@@ -571,13 +586,20 @@ async def replan_for_machine(
             .order_by(ScheduleSlot.order_id)
         )
     )
+    late_order_id = payload.late_order_id
+    if late_order_id is not None and late_order_id not in order_ids:
+        order_ids.append(late_order_id)
     by_order = {}
     for order_id in order_ids:
         needed = await order_requirements(session, order_id)
         report = await forecast(session, needed, order_id=order_id)
         result = await plan_order(session, order_id, report.ready_date, outage=payload)
+        if late_order_id is not None and not await late_job_needs_decision(session, result.plan_option_ids):
+            await clear_proposals(session, order_id)
+            continue
         by_order[str(order_id)] = result.plan_option_ids
-    result = ReplanForMachineResult(affected_order_ids=order_ids, plan_option_ids_by_order=by_order)
+    affected = [order_id for order_id in order_ids if str(order_id) in by_order]
+    result = ReplanForMachineResult(affected_order_ids=affected, plan_option_ids_by_order=by_order)
     await write_audit(
         session,
         "planning",

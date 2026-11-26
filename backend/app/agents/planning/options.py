@@ -33,6 +33,7 @@ class Scenario:
     remaining: list[ScheduleSlot] | None = None
     blocked_reason: str | None = None
     target: Order | None = None
+    late_until: datetime | None = None  # the target's running job is late and ends at this time
 
     def finish_date(self, end: datetime) -> date:
         return (end + timedelta(hours=self.config["qc_buffer_hours"])).astimezone(
@@ -64,6 +65,8 @@ class Scenario:
                 (slot.end_at for slot in self.locked if slot.order_id == self.target.id),
                 default=self.now,
             )
+        if self.late_until is not None:
+            active_until = max(active_until, self.late_until)
         return max(self.now, active_until, utc(self.ready_date, time.min, self.zone))
 
     def horizon(self) -> datetime:

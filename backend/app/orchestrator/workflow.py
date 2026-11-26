@@ -401,9 +401,14 @@ async def handle_order_message(message):
                     await roles(session, "manager", "planner"),
                     "behind_schedule",
                     f"{order.order_number} is behind schedule",
-                    f"Estimated delay is {data.minutes_behind} minutes.",
+                    f"Estimated delay is {data.minutes_behind} minutes. "
+                    "The planner is checking whether any due date is at risk.",
                     f"/orders/{order.id}",
                 )
+                # Imported here because machine_replans imports this module.
+                from .machine_replans import queue_late_order
+
+                await queue_late_order(session, order, data, message.message_id)
         elif message.type == "result":
             task = (run.attempts or {}).get("task")
             if not task or not message.in_reply_to:

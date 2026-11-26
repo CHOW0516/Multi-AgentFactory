@@ -100,6 +100,8 @@ class ReplanForMachinePayload(Contract):
     machine_id: uuid.UUID
     unavailable_from: datetime
     unavailable_to: datetime | None
+    # Set when the machine is busy longer because this order's running job is late (not a breakdown).
+    late_order_id: uuid.UUID | None = None
 
 
 class ReplanForMachineResult(Contract):
@@ -173,6 +175,10 @@ class MachineUnavailable(Contract):
 class OrderBehindSchedule(Contract):
     order_id: uuid.UUID
     minutes_behind: int
+    # The machine running the late job and when that job should now finish at the current pace.
+    machine_id: uuid.UUID | None = None
+    planned_end_at: datetime | None = None
+    expected_end_at: datetime | None = None
 
 
 class OrderStateChanged(Contract):

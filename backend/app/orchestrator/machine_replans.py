@@ -48,6 +48,44 @@ async def enqueue(message):
             )
 
 
+async def queue_late_order(session, order, data, message_id):
+    """A late running job keeps its machine busy longer. Replan like a short machine outage.
+
+    Planning then only returns the orders that can no longer meet their due date, so the manager
+    gets fix options instead of just a warning.
+    """
+    if data.machine_id is None or data.planned_end_at is None or data.expected_end_at is None:
+        return
+    if data.expected_end_at <= data.planned_end_at:
+        return
+    if await session.scalar(
+        select(AuditLog.id).where(AuditLog.entity == ENTITY, AuditLog.entity_id == str(message_id))
+    ):
+        return
+    machine = await session.get(Machine, data.machine_id)
+    if machine is None:
+        return
+    hours = (data.expected_end_at - data.planned_end_at).total_seconds() / 3600
+    session.add(
+        AuditLog(
+            agent="orchestrator",
+            action="pending",
+            entity=ENTITY,
+            entity_id=str(message_id),
+            after={
+                "machine_id": str(machine.id),
+                "from": data.planned_end_at.isoformat(),
+                "to": data.expected_end_at.isoformat(),
+                "reason": (
+                    f"{order.order_number} is running late on {machine.code}. "
+                    f"At the current pace its job ends about {hours:.1f} hours later than planned."
+                ),
+                "late_order_id": str(order.id),
+            },
+        )
+    )
+
+
 async def advance(now=None):
     now = now or datetime.now(UTC)
     async with session_scope() as session:
@@ -91,7 +129,12 @@ async def advance(now=None):
                 "planning",
                 "replan_for_machine",
                 None,
-                dict(machine_id=data["machine_id"], unavailable_from=data["from"], unavailable_to=data["to"]),
+                dict(
+                    machine_id=data["machine_id"],
+                    unavailable_from=data["from"],
+                    unavailable_to=data["to"],
+                    late_order_id=data.get("late_order_id"),
+                ),
                 identifier,
                 attempt=attempt,
             )
@@ -122,6 +165,15 @@ async def finish(message):
             for order_id in data["affected_order_ids"]
         }
         job.after = job.after | {"options": options}
+        if job.after.get("late_order_id") and not options:
+            notify(
+                session,
+                await roles(session, "manager", "planner"),
+                "late_job_absorbed",
+                "Late job: due dates still hold",
+                job.after["reason"] + " Every affected order can still meet its due date.",
+                f"/orders/{job.after['late_order_id']}",
+            )
         await apply_options(session, job)
 
 

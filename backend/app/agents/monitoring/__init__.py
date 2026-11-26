@@ -1,6 +1,6 @@
 """Machine event ingestion and production progress calculations."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Protocol
 
@@ -77,6 +77,20 @@ def minutes_behind(slot, count: int, at: datetime) -> int:
     duration_minutes = (slot.end_at - slot.start_at).total_seconds() / 60
     elapsed_minutes = (at - slot.start_at).total_seconds() / 60
     return max(0, int(elapsed_minutes - float(count / slot.quantity) * duration_minutes))
+
+
+def expected_end(slot, count: int, at: datetime, delay_minutes: int) -> datetime:
+    """When the job should finish if it keeps the pace seen so far.
+
+    Never earlier than the planned end plus the delay already seen. Capped at twice the planned
+    run time, because a pace read from the first few parts can be far off.
+    """
+    at_least = slot.end_at + timedelta(minutes=delay_minutes)
+    if count <= 0:
+        return at_least
+    at_pace = slot.start_at + (at - slot.start_at) * (float(slot.quantity) / count)
+    at_most = slot.end_at + (slot.end_at - slot.start_at)
+    return min(max(at_least, at_pace), max(at_least, at_most))
 
 
 async def handle(message):
@@ -169,7 +183,13 @@ async def handle(message):
                         emit(
                             session,
                             "event.order.behind_schedule",
-                            dict(order_id=slot.order_id, minutes_behind=delay),
+                            dict(
+                                order_id=slot.order_id,
+                                minutes_behind=delay,
+                                machine_id=machine.id,
+                                planned_end_at=slot.end_at,
+                                expected_end_at=expected_end(slot, int(raw.value), raw.at, delay),
+                            ),
                             actor="monitoring",
                         )
         session.add(

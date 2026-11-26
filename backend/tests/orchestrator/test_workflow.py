@@ -274,3 +274,68 @@ async def test_machine_unavailability_creates_replan_approval(db_session, fake_b
         and approvals[0].approval_type == "replan"
         and approvals[0].what_changed == ["Breakdown"]
     )
+
+
+async def test_late_job_creates_replan_approval_for_orders_at_risk(db_session, fake_broker):
+    order = await make_order(db_session, status="IN_PRODUCTION")
+    machine = Machine(code="LATHE-01", machine_type="lathe", name="Lathe")
+    option = PlanOption(order_id=order.id, option_type="delay", finish_date=date(2026, 12, 3))
+    db_session.add_all([machine, option])
+    db_session.add(WorkflowRun(order_id=order.id, state=order.status, attempts={}))
+    await db_session.commit()
+    planned_end = datetime.now(UTC)
+    await event(
+        "order.behind_schedule",
+        order,
+        minutes_behind=45,
+        machine_id=str(machine.id),
+        planned_end_at=planned_end.isoformat(),
+        expected_end_at=(planned_end + timedelta(hours=3)).isoformat(),
+    )
+    await machine_replans.advance()
+    (task,) = tasks(fake_broker, "replan_for_machine")
+    assert task.payload["late_order_id"] == str(order.id)
+    assert datetime.fromisoformat(task.payload["unavailable_to"]) == planned_end + timedelta(hours=3)
+    result = await publish_result(
+        task,
+        "ok",
+        {"affected_order_ids": [order.id], "plan_option_ids_by_order": {str(order.id): [option.id]}},
+    )
+    await handle(result)
+    (approval,) = await db_session.scalars(select(Approval).where(Approval.order_id == order.id))
+    assert approval.approval_type == "replan"
+    assert approval.what_changed[0].startswith(f"{order.order_number} is running late on LATHE-01.")
+    assert await state(db_session, order) == "WAITING_APPROVAL"
+
+
+async def test_late_job_that_keeps_due_dates_only_notifies(db_session, fake_broker, users):
+    order = await make_order(db_session, status="IN_PRODUCTION")
+    machine = Machine(code="LATHE-02", machine_type="lathe", name="Lathe")
+    db_session.add(machine)
+    db_session.add(WorkflowRun(order_id=order.id, state=order.status, attempts={}))
+    await db_session.commit()
+    planned_end = datetime.now(UTC)
+    await event(
+        "order.behind_schedule",
+        order,
+        minutes_behind=40,
+        machine_id=str(machine.id),
+        planned_end_at=planned_end.isoformat(),
+        expected_end_at=(planned_end + timedelta(hours=1)).isoformat(),
+    )
+    await machine_replans.advance()
+    (task,) = tasks(fake_broker, "replan_for_machine")
+    await handle(await publish_result(task, "ok", {"affected_order_ids": [], "plan_option_ids_by_order": {}}))
+    assert await db_session.scalar(select(func.count()).select_from(Approval)) == 0
+    kinds = set(await db_session.scalars(select(Notification.kind)))
+    assert {"behind_schedule", "late_job_absorbed"} <= kinds
+    assert await state(db_session, order) == "IN_PRODUCTION"
+
+
+async def test_old_behind_schedule_event_only_notifies(db_session, fake_broker):
+    order = await make_order(db_session, status="IN_PRODUCTION")
+    db_session.add(WorkflowRun(order_id=order.id, state=order.status, attempts={}))
+    await db_session.commit()
+    await event("order.behind_schedule", order, minutes_behind=40)
+    await machine_replans.advance()
+    assert tasks(fake_broker, "replan_for_machine") == []
