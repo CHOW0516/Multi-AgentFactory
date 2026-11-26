@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useChatPanel } from "../../components/chat-store";
+import { ChatMarkdown } from "./ChatMarkdown";
 import { splitToolLines, streamChat, type StreamChat } from "./stream";
+
+/** The same tool used twice shows once, with a count. */
+function countTools(tools: string[]): [string, number][] {
+  const counts = new Map<string, number>();
+  for (const tool of tools) counts.set(tool, (counts.get(tool) ?? 0) + 1);
+  return [...counts];
+}
 
 interface ChatMessage { id: number; from: "you" | "orchestrator"; text: string; failed?: boolean }
 
@@ -76,8 +84,12 @@ export function ChatPanel({ stream = streamChat }: { stream?: StreamChat }) {
           const { tools, answer } = splitToolLines(message.text);
           return (
             <div key={message.id} className={`chat-bubble chat-reply${message.failed ? " chat-failed" : ""}`}>
-              {tools.length > 0 ? <div className="chat-tools">{tools.map((tool, index) => <span key={`${tool}-${index}`} className="badge">⚙ {tool}</span>)}</div> : null}
-              {answer || (busy ? <span className="muted">Thinking…</span> : null)}
+              {tools.length > 0 ? (
+                <div className="chat-tools">{countTools(tools).map(([tool, count]) => (
+                  <span key={tool} className="badge">⚙ {tool}{count > 1 ? ` ×${count}` : ""}</span>
+                ))}</div>
+              ) : null}
+              {answer ? <ChatMarkdown text={answer} /> : busy ? <span className="muted">Thinking…</span> : null}
             </div>
           );
         })}
