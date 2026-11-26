@@ -7,6 +7,7 @@ const PATHS: Record<string, string> = {
   materials: "M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4 9-4V7M12 11v10",
   quotations: "M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h4",
   dashboards: "M4 20V10m6 10V4m6 16v-7m4 7H2",
+  line: "M2 9h5v6H2zm8 0h5v6h-5zm8 0h4v6h-4zM7 12h3m5 0h3",
   agents: "M12 9a3 3 0 100-6 3 3 0 000 6zm-7 12a3 3 0 100-6 3 3 0 000 6zm14 0a3 3 0 100-6 3 3 0 000 6zM12 9v4m0 0l-5 3m5-3l5 3",
   quality: "M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3zm-3 9l2 2 4-4",
   history: "M3 12a9 9 0 103-6.7M3 4v4h4m5-1v5l3 3",
