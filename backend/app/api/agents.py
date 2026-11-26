@@ -55,10 +55,17 @@ async def queue_counts():
         return {}
 
 
+def agent_catalog():
+    if settings.app_mode == "demo":
+        return AGENTS | {"simulator": ("Produces demo purchase orders and machine events.", False)}
+    return AGENTS
+
+
 def scope(name):
-    if name not in AGENTS:
+    catalog = agent_catalog()
+    if name not in catalog:
         raise HTTPException(404, "Agent not found")
-    return AGENTS[name]
+    return catalog[name]
 
 
 def messages_for(name):
@@ -127,7 +134,7 @@ async def stats(session, name, queues, user):
 @router.get("/agents", response_model=list[AgentSummary])
 async def agents(session=Depends(get_session), user=Depends(current_user)):
     queues = await queue_counts()
-    return [await stats(session, name, queues, user) for name in AGENTS]
+    return [await stats(session, name, queues, user) for name in agent_catalog()]
 
 
 @router.get("/agents/{name}", response_model=AgentSummary)

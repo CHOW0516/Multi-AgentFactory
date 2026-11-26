@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
+import pytest
 from sqlalchemy import func, select
 
 from app.agents.maintenance import scan
@@ -330,4 +331,33 @@ async def test_history_and_order_replay(db_session, client, auth_headers, users)
     assert timeline.status_code == 200
     assert [entry["kind"] for entry in timeline.json()] == ["document", "human_action", "agent_message"]
     stats = await client.get("/api/agents", headers=manager)
-    assert stats.status_code == 200 and len(stats.json()) == 7
+    assert stats.status_code == 200 and len(stats.json()) == 8
+
+
+@pytest.mark.parametrize("mode,available", [("demo", True), ("production", False)])
+async def test_simulator_agent_is_available_only_in_demo(client, auth_headers, monkeypatch, mode, available):
+    from app.core.config import get_settings
+    from app.messaging import publish_event
+
+    monkeypatch.setattr(get_settings(), "app_mode", mode)
+    event = await publish_event(
+        "event.machine.raw",
+        {"machine_id": str(uuid.uuid4()), "kind": "status", "value": "idle", "at": datetime.now(UTC).isoformat()},
+        from_agent="simulator",
+    )
+    headers = auth_headers("manager")
+    listing = await client.get("/api/agents", headers=headers)
+    assert listing.status_code == 200
+    assert any(row["name"] == "simulator" for row in listing.json()) is available
+    summary = await client.get("/api/agents/simulator", headers=headers)
+    messages = await client.get("/api/agents/simulator/messages?limit=50", headers=headers)
+    if available:
+        assert summary.status_code == 200, summary.text
+        assert summary.json()["name"] == "simulator"
+        assert summary.json()["uses_llm"] is False
+        assert datetime.fromisoformat(summary.json()["last_seen"]) == event.sent_at
+        assert messages.status_code == 200, messages.text
+        assert messages.json()["total"] == 1
+        assert messages.json()["items"][0]["message_id"] == str(event.message_id)
+    else:
+        assert summary.status_code == messages.status_code == 404
