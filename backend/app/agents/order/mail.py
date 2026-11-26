@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import imaplib
+import json
 import logging
 from email import policy
 from email.parser import BytesParser
@@ -11,7 +12,9 @@ from sqlalchemy import select
 
 from app.agents.order.events import flush_events
 from app.agents.order.intake import (
+    DEMO_DATA_FILE,
     DOCUMENT_TYPES,
+    MAX_DEMO_DATA_BYTES,
     MAX_DOCUMENT_BYTES,
     Attachment,
     EmailMetadata,
@@ -34,6 +37,17 @@ def is_decoration(part, attachment: Attachment) -> bool:
     return part.get("Content-ID") is not None or len(attachment.content) < MIN_IMAGE_BYTES
 
 
+def demo_data(content: bytes) -> bytes | None:
+    """Simulator PO values; ignored outside demo mode and when invalid."""
+    if not settings.is_demo or len(content) > MAX_DEMO_DATA_BYTES:
+        return None
+    try:
+        json.loads(content)
+    except ValueError:
+        return None
+    return content
+
+
 def message_parts(raw: bytes) -> tuple[EmailMetadata, list[Attachment], list[str]]:
     """Returns the email, the attachments to read, and the names of attachments that were skipped."""
     message = BytesParser(policy=policy.default).parsebytes(raw)
@@ -43,13 +57,17 @@ def message_parts(raw: bytes) -> tuple[EmailMetadata, list[Attachment], list[str
     body_part = message.get_body(preferencelist=("plain",))
     body = body_part.get_content() if body_part is not None else ""
     attachments, skipped = [], []
+    simulator_values = None
     has_attachment = False
     for part in message.walk():
         filename = part.get_filename()
         if not filename or part.is_multipart():
             continue
-        has_attachment = True
         attachment = Attachment(filename, part.get_payload(decode=True) or b"")
+        if filename == DEMO_DATA_FILE:
+            simulator_values = demo_data(attachment.content)
+            continue
+        has_attachment = True
         if is_decoration(part, attachment):
             continue
         if attachment.suffix in DOCUMENT_TYPES and 0 < len(attachment.content) <= MAX_DOCUMENT_BYTES:
@@ -66,6 +84,7 @@ def message_parts(raw: bytes) -> tuple[EmailMetadata, list[Attachment], list[str
         str(message.get("From", ""))[:300],
         str(message.get("Subject", ""))[:500],
         body if isinstance(body, str) else "",
+        simulator_values,
     )
     return metadata, attachments, skipped
 

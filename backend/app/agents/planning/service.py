@@ -3,7 +3,6 @@
 import asyncio
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
@@ -19,8 +18,6 @@ from app.agents.planning.solver import Job
 from app.api.settings import effective_settings
 from app.core.audit import write_audit
 from app.core.config import settings
-from app.core.db import session_scope
-from app.llm.client import DailyCostLimitReached, LlmRefused, LlmUnavailable, call_ai
 from app.models import (
     CLOSED_ORDER_STATES,
     AuditLog,
@@ -181,8 +178,8 @@ def explanation_parts(
     margin: Decimal,
     missing_costs: list[str],
     reasons: dict[str, str],
-) -> tuple[str, str, dict]:
-    """The computed sentence before the AI wording, the computed details after it, and the AI facts."""
+) -> tuple[str, str]:
+    """The delivery sentence and the computed details that follow the option sentence."""
     ready = f"The full order can ship by {candidate.finish_date:%d %B %Y}."
     if candidate.first_finish and candidate.first_quantity is not None:
         ready = (
@@ -202,63 +199,26 @@ def explanation_parts(
     if not candidate.optimal:
         detail.append("The solver returned a feasible schedule before it could establish optimality.")
     tail = (" " + " ".join(detail) if detail else "") + skipped_text(reasons)
-    facts = {
-        "option": candidate.kind,
-        "delivery": ready,
-        "overtime_hours": str(candidate.overtime_seconds / HOUR),
-        "extra_cost": str(candidate.extra_cost),
-        "margin": str(margin),
-        "machine_load": candidate.load,
-        "impacted_orders": [
-            {key: value for key, value in row.items() if key != "source_slots"} for row in candidate.impacted
-        ],
-        "skipped": reasons,
-    }
-    return ready, tail, facts
+    return ready, tail
 
 
-async def ai_wording(order_id: UUID, facts: dict) -> str:
-    """One optional AI sentence. Returns "" when the AI is unavailable or the reply is unusable."""
-    try:
-        result = await call_ai(
-            "planning",
-            "explain",
-            [{"role": "user", "content": str(facts)}],
-            system=(
-                "Explain this production option in one short sentence based only on the supplied facts. "
-                "Do not quote any numbers or dates; the system inserts those separately."
-            ),
-            order_id=order_id,
-        )
-    except (LlmUnavailable, DailyCostLimitReached, LlmRefused):
-        logger.info("Using computed explanation for order %s", order_id)
-        return ""
-    line = result.text.strip()
-    if line and len(line) <= 300 and "\n" not in line and not any(char.isdigit() for char in line):
-        return " " + line
-    return ""
+# One plain sentence per option type. These replaced an AI call per option: the AI was not allowed
+# to use numbers or dates, so it only reworded what these sentences say, at a cost on every plan.
+OPTION_SENTENCES = {
+    "as_requested": "This plan meets the requested date with normal shifts.",
+    "delay": "This is the earliest date the current machine time and material allow.",
+    "split": "This plan ships part of the order early and the rest later.",
+    "overtime": "This plan meets the date by adding overtime.",
+    "move_other_order": "This plan meets the date by moving other orders later.",
+}
 
 
-@dataclass
-class WordingJob:
-    """AI wording to add after the planning transaction has committed (no AI call while locks are held)."""
-
-    option_id: UUID
-    order_id: UUID
-    ready: str
-    tail: str
-    facts: dict
-
-
-async def add_wording(jobs: list[WordingJob]) -> None:
-    for job in jobs:
-        wording = await ai_wording(job.order_id, job.facts)
-        if not wording:
-            continue
-        async with session_scope() as session:
-            option = await session.get(PlanOption, job.option_id)
-            if option is not None and option.explanation == job.ready + job.tail:
-                option.explanation = job.ready + wording + job.tail
+def explanation_text(
+    candidate: Candidate, margin: Decimal, missing_costs: list[str], reasons: dict[str, str]
+) -> str:
+    ready, tail = explanation_parts(candidate, margin, missing_costs, reasons)
+    sentence = OPTION_SENTENCES.get(candidate.kind)
+    return ready + (" " + sentence if sentence else "") + tail
 
 
 async def clear_proposals(session: AsyncSession, order_id: UUID, option_id: UUID | None = None) -> None:
@@ -283,7 +243,6 @@ async def plan_order(
     task_id: UUID | None = None,
     *,
     outage: ReplanForMachinePayload | None = None,
-    wording_jobs: list[WordingJob] | None = None,
 ) -> PlanOrderResult:
     await serialize_writes(session)
     if task_id is not None:
@@ -338,14 +297,9 @@ async def plan_order(
             is_recommended=candidate.recommended,
             status="proposed",
         )
-        ready, tail, facts = explanation_parts(candidate, margin, missing_costs, reasons)
-        option.explanation = ready + tail
+        option.explanation = explanation_text(candidate, margin, missing_costs, reasons)
         session.add(option)
         await session.flush()
-        if wording_jobs is None:
-            option.explanation = ready + await ai_wording(order.id, facts) + tail
-        else:
-            wording_jobs.append(WordingJob(option.id, order.id, ready, tail, facts))
         displaced = {
             UUID(row["id"]): UUID(impact["order_id"])
             for impact in candidate.impacted
@@ -597,7 +551,6 @@ async def replan_for_machine(
     session: AsyncSession,
     payload: ReplanForMachinePayload,
     task_id: UUID | None = None,
-    wording_jobs: list[WordingJob] | None = None,
 ) -> ReplanForMachineResult:
     await serialize_writes(session)
     machine_id = payload.machine_id
@@ -622,9 +575,7 @@ async def replan_for_machine(
     for order_id in order_ids:
         needed = await order_requirements(session, order_id)
         report = await forecast(session, needed, order_id=order_id)
-        result = await plan_order(
-            session, order_id, report.ready_date, outage=payload, wording_jobs=wording_jobs
-        )
+        result = await plan_order(session, order_id, report.ready_date, outage=payload)
         by_order[str(order_id)] = result.plan_option_ids
     result = ReplanForMachineResult(affected_order_ids=order_ids, plan_option_ids_by_order=by_order)
     await write_audit(

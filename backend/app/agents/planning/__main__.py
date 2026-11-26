@@ -15,18 +15,11 @@ from app.schemas.envelope import Envelope
 
 
 async def handle(task: Envelope) -> None:
-    # AI wording is added after the planning transaction commits, so no AI call runs while
-    # the schedule lock and a database connection are held.
-    wording_jobs: list[service.WordingJob] = []
     async with session_scope() as session:
         if task.action == "plan_order":
             payload = PlanOrderPayload.model_validate(task.payload)
             result = await service.plan_order(
-                session,
-                payload.order_id,
-                payload.material_ready_date,
-                task.message_id,
-                wording_jobs=wording_jobs,
+                session, payload.order_id, payload.material_ready_date, task.message_id
             )
         elif task.action == "recheck_plan":
             payload = PlanOptionRef.model_validate(task.payload)
@@ -41,12 +34,9 @@ async def handle(task: Envelope) -> None:
             result = Empty()
         elif task.action == "replan_for_machine":
             payload = ReplanForMachinePayload.model_validate(task.payload)
-            result = await service.replan_for_machine(
-                session, payload, task.message_id, wording_jobs=wording_jobs
-            )
+            result = await service.replan_for_machine(session, payload, task.message_id)
         else:
             raise ValueError(f"Unsupported planning action: {task.action}")
-    await service.add_wording(wording_jobs)
     await publish_result(task, "ok", result)
 
 

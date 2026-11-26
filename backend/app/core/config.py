@@ -79,7 +79,11 @@ class Settings(BaseSettings):
     planning_solver_time_limit_seconds: int = 30
 
     # Simulator
-    sim_po_interval_seconds: int = 300
+    sim_send_pos: bool = True  # false: the simulator only runs the machines
+    sim_po_interval_seconds: int = 3600
+    # Demo POs carry their printed values, so reading them costs no AI call. Set false to show
+    # real AI extraction on simulator POs.
+    sim_skip_ai: bool = True
     sim_machine_event_interval_seconds: int = 20
     sim_breakdown_chance_per_hour: float = 0.05
     sim_random_seed: int = 42

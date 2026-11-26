@@ -24,6 +24,7 @@ from app.models import (
     MaintenanceEvent,
     Notification,
     Order,
+    OrderLine,
     PurchaseRequest,
     ScheduleSlot,
     StockHold,
@@ -314,3 +315,57 @@ async def test_login_is_rate_limited(client, users):
     response = await client.post("/api/auth/login", json={"email": "nobody@x.test", "password": "wrong"})
     assert response.status_code == 429
     auth.failed_logins.clear()
+
+
+# ---------------------------------------------------------------- AI cost cuts
+
+
+def test_pdf_text_layer_is_read_and_bad_pdfs_fall_back_to_images():
+    from app.agents.order.extraction import pdf_text
+
+    assert "PO" in pdf_text(FILES[0].read_bytes())
+    assert pdf_text(b"not a pdf") == ""
+
+
+async def test_simulator_po_is_read_without_ai(catalog, db_session, fake_ai, fake_broker, monkeypatch):
+    from app.agents.order.intake import DEMO_DATA_FILE
+
+    monkeypatch.setattr(get_settings(), "app_mode", "demo")
+    message = EmailMessage()
+    message["Message-ID"] = "<demo-po@example.test>"
+    message["From"] = "purchasing@example.test"
+    message["Subject"] = "Purchase order"
+    message.set_content("Please see the attached order.")
+    message.add_attachment(FILES[0].read_bytes(), maintype="application", subtype="pdf", filename="po.pdf")
+    message.add_attachment(
+        json.dumps(extraction()).encode(), maintype="application", subtype="json", filename=DEMO_DATA_FILE
+    )
+    metadata, files, skipped = mail.message_parts(message.as_bytes())
+    assert [file.filename for file in files] == ["po.pdf"] and skipped == []
+    (order,) = await store_documents(files, email=metadata)
+    await extract_document(order.source_document_id)
+    assert fake_ai.requests == []
+    line = await db_session.scalar(select(OrderLine).where(OrderLine.order_id == order.id))
+    assert line.part_id == catalog.part.id
+
+
+async def test_demo_data_is_ignored_outside_demo_mode(monkeypatch):
+    monkeypatch.setattr(get_settings(), "app_mode", "production")
+    assert mail.demo_data(b"{}") is None
+
+
+async def test_same_file_is_not_read_twice(catalog, db_session, fake_ai, fake_broker):
+    first, _ = await extract_po(fake_ai)
+    data = FILES[0].read_bytes()
+    (second,) = await store_documents([Attachment("resent.pdf", data)])
+    result = await extract_document(second.source_document_id)
+    assert len(fake_ai.requests) == 1  # the resend reused the first reading
+    assert "po_number" in result.fields_needing_check  # and is flagged as a duplicate
+
+
+def test_plan_explanations_use_fixed_sentences():
+    from app.agents.planning import service
+    from app.agents.planning.service import OPTION_SENTENCES
+
+    assert not hasattr(service, "call_ai")
+    assert set(OPTION_SENTENCES) == {"as_requested", "delay", "split", "overtime", "move_other_order"}

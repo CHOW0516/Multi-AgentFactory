@@ -1,6 +1,9 @@
 """Extract grounded fields and reconcile them with the factory's catalog."""
 
 import asyncio
+import hashlib
+import json
+import logging
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -13,6 +16,7 @@ from docx.table import Table
 from openpyxl import load_workbook
 from PIL import Image, ImageSequence
 from pydantic import BaseModel, ConfigDict, field_validator
+from pypdf import PdfReader
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,10 +24,13 @@ from app.agents.order.events import flush_events, stage_event
 from app.agents.order.intake import document_path
 from app.api.settings import effective_settings
 from app.core.audit import write_audit
+from app.core.config import settings
 from app.core.db import session_scope
 from app.llm.client import call_ai, document_block, image_block
 from app.models import AuditLog, Customer, ExtractedField, Order, OrderLine, Part, Quotation, SourceDocument
 from app.schemas.contracts import ExtractDocumentResult, QuotationMismatch
+
+logger = logging.getLogger(__name__)
 
 
 class ExtractionModel(BaseModel):
@@ -81,11 +88,32 @@ IGNORED_PREVIOUS = ("CANCELLED", "REJECTED", "DECLINED", "SENDER_REVIEW")
 PROTECTED_FROM_REVISION = ("IN_PRODUCTION", "COMPLETED")
 
 
+# A PDF with less text than this is treated as a scan and sent as an image.
+MIN_PDF_TEXT_CHARS = 80
+
+
+def pdf_text(data: bytes) -> str:
+    """The PDF's own text layer, keeping the column layout. Empty for scans or unreadable files."""
+    try:
+        reader = PdfReader(BytesIO(data))
+        pages = [page.extract_text(extraction_mode="layout") or "" for page in reader.pages]
+    except Exception:  # a damaged or encrypted PDF: fall back to sending it as an image
+        logger.info("Could not read the PDF text layer; sending the PDF as an image")
+        return ""
+    lines = [re.sub(r" {3,}", "   ", line.rstrip()) for page in pages for line in page.splitlines()]
+    return "\n".join(line for line in lines if line.strip())
+
+
 def input_blocks(document: SourceDocument) -> list[dict]:
     path = document_path(document.file_path)
     data = path.read_bytes()
     mime = document.mime_type
     if mime == "application/pdf":
+        # Most emailed POs come from an ERP and carry a text layer. Text costs far fewer tokens than
+        # an image, can go to a cheaper model, and lets check_against_document verify the values.
+        text_layer = pdf_text(data)
+        if len(text_layer) >= MIN_PDF_TEXT_CHARS:
+            return [{"type": "text", "text": "Purchase order (text layer of a PDF):\n" + text_layer}]
         return [document_block(data)]
     if mime == "image/tiff":
         blocks = []
@@ -485,6 +513,48 @@ async def lock_document(session: AsyncSession, document_id: UUID) -> tuple[Sourc
     return document, order
 
 
+def demo_data_path(document: SourceDocument):
+    """Simulator POs carry the values printed on them in this side file (demo mode only)."""
+    return document_path(f"{document.file_path}.demo.json")
+
+
+async def earlier_extraction(session: AsyncSession, digest: str) -> PurchaseOrder | None:
+    """The same file was read before (a resent PO): reuse that reading instead of paying again."""
+    entry = await session.scalar(
+        select(AuditLog)
+        .where(
+            AuditLog.agent == "order",
+            AuditLog.action == "extract_document",
+            AuditLog.after["sha256"].as_string() == digest,
+        )
+        .order_by(AuditLog.created_at.desc())
+        .limit(1)
+    )
+    if entry is None or "raw" not in entry.after:
+        return None
+    return PurchaseOrder.model_validate(entry.after["raw"])
+
+
+async def read_purchase_order(document: SourceDocument, order_id: UUID, blocks: list[dict], digest: str):
+    """Returns the extraction and where it came from: 'demo', 'reused' or 'ai'."""
+    sidecar = demo_data_path(document)
+    if settings.is_demo and sidecar.is_file():
+        return PurchaseOrder.model_validate(json.loads(sidecar.read_text())), "demo"
+    async with session_scope() as session:
+        reused = await earlier_extraction(session, digest)
+    if reused is not None:
+        return reused, "reused"
+    response = await call_ai(
+        "order",
+        "extraction",
+        [{"role": "user", "content": blocks}],
+        system=SYSTEM_PROMPT + "\nReply with one JSON object that matches the given schema and nothing else.",
+        response_schema=PurchaseOrder.model_json_schema(),
+        order_id=order_id,
+    )
+    return PurchaseOrder.model_validate(response.data), "ai"
+
+
 async def extract_document(document_id: UUID) -> ExtractDocumentResult:
     # Step 1: a short transaction to find the order and reuse an earlier result.
     async with session_scope() as session:
@@ -494,17 +564,12 @@ async def extract_document(document_id: UUID) -> ExtractDocumentResult:
     if result is not None:
         return result
 
-    # Step 2: the AI call, with no database transaction or lock held.
+    # Step 2: read the PO (AI call, demo data or an earlier reading of the same file),
+    # with no database transaction or lock held.
+    data = await asyncio.to_thread(document_path(document.file_path).read_bytes)
+    digest = hashlib.sha256(data).hexdigest()
     blocks = await asyncio.to_thread(input_blocks, document)
-    response = await call_ai(
-        "order",
-        "extraction",
-        [{"role": "user", "content": blocks}],
-        system=SYSTEM_PROMPT + "\nReply with one JSON object that matches the given schema and nothing else.",
-        response_schema=PurchaseOrder.model_json_schema(),
-        order_id=order_id,
-    )
-    extraction = PurchaseOrder.model_validate(response.data)
+    extraction, source = await read_purchase_order(document, order_id, blocks, digest)
 
     # Step 3: save. Another worker may have finished first; then its result wins.
     async with session_scope() as session:
@@ -528,7 +593,12 @@ async def extract_document(document_id: UUID) -> ExtractDocumentResult:
                 "orders",
                 order.id,
                 None,
-                {"result": result.model_dump(mode="json")},
+                {
+                    "result": result.model_dump(mode="json"),
+                    "raw": extraction.model_dump(mode="json"),
+                    "sha256": digest,
+                    "source": source,
+                },
             )
     await flush_events(order_id)
     return result

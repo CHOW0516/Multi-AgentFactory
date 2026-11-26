@@ -9,11 +9,18 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import write_audit
-from app.llm.client import DailyCostLimitReached, LlmRefused, LlmUnavailable, call_ai
 from app.models import CustomerMessage, Order, OrderLine, PlanOption
 from app.schemas.contracts import DraftCustomerReplyResult
 
 logger = logging.getLogger(__name__)
+
+OPENINGS = {
+    "confirm": "Thank you for your purchase order.",
+    "propose a new date": "Thank you for your purchase order. We have reviewed it against our schedule.",
+    "split delivery": "Thank you for your purchase order. To get the parts to you as early as possible, we "
+    "propose two deliveries.",
+    "decline": "Thank you for your purchase order and for thinking of us.",
+}
 
 
 async def draft_customer_reply(
@@ -63,30 +70,9 @@ async def draft_customer_reply(
             scenario = "confirm"
             facts = f"We confirm delivery of purchase order {reference} by {option.finish_date:%d %B %Y}."
 
-    opening = "Thank you for your purchase order."
-    try:
-        response = await call_ai(
-            "order",
-            "explain",
-            [
-                {
-                    "role": "user",
-                    "content": f"Write a brief, polite opening thanking a customer. Context: {scenario}.",
-                }
-            ],
-            system="Return one short sentence of courtesy only. Include no dates, quantities, names or promises.",
-            order_id=order_id,
-        )
-        sentence = response.text.strip()
-        if (
-            sentence
-            and len(sentence) <= 180
-            and not any(char.isdigit() for char in sentence)
-            and "\n" not in sentence
-        ):
-            opening = sentence
-    except (LlmUnavailable, DailyCostLimitReached, LlmRefused):
-        logger.info("Using default customer reply wording for order %s", order_id)
+    # A fixed courtesy line per case. This replaced an AI call per reply: the AI was not allowed to
+    # use dates, quantities, names or promises, so it could only rephrase these lines.
+    opening = OPENINGS[scenario]
     message = CustomerMessage(
         order_id=order_id,
         plan_option_id=plan_option_id,

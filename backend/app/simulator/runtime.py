@@ -7,6 +7,7 @@ The simulator never writes business data itself; the agents react to its emails 
 """
 
 import asyncio
+import json
 import logging
 import random
 import smtplib
@@ -18,11 +19,12 @@ from email.message import EmailMessage
 
 from sqlalchemy import and_, select
 
+from app.agents.order.intake import DEMO_DATA_FILE
 from app.core.config import settings
 from app.core.db import session_scope
 from app.messaging import publish_event
 from app.models import Customer, Machine, Part, Quotation, ScheduleSlot
-from app.simulator.po_documents import DemoPurchaseOrder, make_purchase_order, render_pdf
+from app.simulator.po_documents import DemoPurchaseOrder, demo_extraction, make_purchase_order, render_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +78,10 @@ def email_purchase_order(order: DemoPurchaseOrder, sender: str) -> str:
     message.add_attachment(
         render_pdf(order), maintype="application", subtype="pdf", filename=f"{order.po_number}.pdf"
     )
+    if settings.sim_skip_ai:
+        # The order agent uses these values instead of calling the AI (demo mode only).
+        data = json.dumps(demo_extraction(order)).encode()
+        message.add_attachment(data, maintype="application", subtype="json", filename=DEMO_DATA_FILE)
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as smtp:
         smtp.send_message(message)
     return message["Message-ID"]
@@ -187,6 +193,9 @@ async def run_forever() -> None:
     machines = MachineSimulation(randomizer)
 
     async def purchase_order_loop() -> None:
+        if not settings.sim_send_pos:
+            logger.info("SIM_SEND_POS=false: the simulator sends no demo POs")
+            return
         while True:
             try:
                 await send_one_purchase_order(randomizer)

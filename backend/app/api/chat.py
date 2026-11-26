@@ -25,6 +25,10 @@ router = APIRouter(tags=["chat"])
 context_by_user = OrderedDict()
 context_locks = [asyncio.Lock() for _ in range(64)]
 MAX_ROUNDS = 6
+# Each round resends the history, so keep it short: the last 3 questions and answers.
+HISTORY_MESSAGES = 6
+CHAT_MAX_TOKENS = 1000
+MAX_SCHEDULE_ROWS = 30
 
 UUID = {"type": "string", "format": "uuid"}
 DATETIME = {"type": "string", "format": "date-time"}
@@ -113,7 +117,7 @@ async def read_tool(name, arguments, order_id, user, app):
                         filters.append(column > stamp if after else column < stamp)
                 if "machine_id" in arguments:
                     filters.append(ScheduleSlot.machine_id == uuid.UUID(arguments["machine_id"]))
-                return await schedule_rows(session, *filters, limit=100)
+                return await schedule_rows(session, *filters, limit=MAX_SCHEDULE_ROWS)
             if "order_id" in arguments:
                 order_id = uuid.UUID(arguments["order_id"])
             order = await session.get(Order, order_id) if order_id else None
@@ -151,7 +155,7 @@ async def read_tool(name, arguments, order_id, user, app):
 async def respond(body, user, app):
     async with context_locks[user.id.int % len(context_locks)]:
         key = (user.id, user.role)
-        history = context_by_user.setdefault(key, deque(maxlen=20))
+        history = context_by_user.setdefault(key, deque(maxlen=HISTORY_MESSAGES))
         context_by_user.move_to_end(key)
         if len(context_by_user) > 1000:
             context_by_user.popitem(last=False)
@@ -175,6 +179,7 @@ async def respond(body, user, app):
                     tools=TOOLS,
                     system=system,
                     order_id=body.order_id,
+                    max_tokens=CHAT_MAX_TOKENS,
                 )
                 blocks = [block for block in reply.message.content if block.type == "tool_use"]
                 if not blocks:

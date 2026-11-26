@@ -44,6 +44,10 @@ class Attachment:
         return Path(self.filename).suffix.lower()
 
 
+# Email attachment with the simulator PO's printed values (JSON); honoured only in demo mode.
+DEMO_DATA_FILE = "factory-demo-data.json"
+MAX_DEMO_DATA_BYTES = 64 * 1024
+
 # Senders on these domains are matched by full address, never by domain.
 PUBLIC_MAIL_DOMAINS = {"gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com", "icloud.com"}
 
@@ -70,6 +74,7 @@ class EmailMetadata:
     sender: str
     subject: str
     body: str
+    demo_data: bytes | None = None
 
 
 def document_path(stored_path: str) -> Path:
@@ -131,6 +136,10 @@ async def store_documents(
                     path = document_path(stored_path)
                     await asyncio.to_thread(write_attachment, path, attachment.content)
                     created_paths.append(path)
+                    if email and email.demo_data and settings.is_demo and len(attachments) == 1:
+                        sidecar = document_path(f"{stored_path}.demo.json")
+                        await asyncio.to_thread(write_attachment, sidecar, email.demo_data)
+                        created_paths.append(sidecar)
                     document = SourceDocument(
                         id=document_id,
                         file_path=stored_path,
