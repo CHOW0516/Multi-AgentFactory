@@ -96,6 +96,58 @@
   line-height: 1.12;
   letter-spacing: -.047em;
 }
+.floor-edit-toggle { margin-bottom: 10px; pointer-events: auto; }
+.floor-road-surface { fill: var(--floor-road); }
+.floor-zone, .floor-aisle-edge { fill: none; stroke: var(--p5-mark); stroke-width: 1.6px; }
+.floor-edit-grid { fill: none; stroke: var(--anatomy-hi); stroke-opacity: .28; stroke-width: .55px; pointer-events: none; }
+.floor-cursor-cell { fill: var(--color-accent); fill-opacity: .16; stroke: var(--color-accent); stroke-width: 1px; }
+.floor-selection-cell { fill: var(--color-accent); fill-opacity: .12; stroke: var(--color-accent); stroke-width: 2px; }
+.floor-ghost-cell { fill: #147d46; fill-opacity: .25; stroke: #147d46; stroke-width: 2px; }
+[data-placement-valid="false"] .floor-ghost-cell { fill: #c73636; stroke: #c73636; }
+.floor-ghost-model { opacity: .65; }
+.floor-decor-target { cursor: pointer; }
+.floor-decor-target:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.floor-editor .floor-model { cursor: crosshair; }
+.floor-editor .floor-camera-controls { top: auto; bottom: var(--floor-inset); display: flex; }
+.floor-editor-toolbar, .floor-editor-palette, .floor-editor-properties, .floor-editor-notice { position: absolute; z-index: 3; }
+.floor-editor-toolbar { inset: var(--floor-inset) var(--floor-inset) auto; padding: 12px 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.floor-editor-toolbar h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.035em; }
+.floor-editor-toolbar [role="status"] { font-size: 12px; color: var(--color-text-muted); }
+.floor-editor-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.floor-editor-actions .button { min-height: 34px; padding: 6px 10px; }
+.floor-editor-palette, .floor-editor-properties { top: 110px; bottom: 110px; width: 220px; overflow: auto; overscroll-behavior: contain; padding: 14px; }
+.floor-editor-palette { left: var(--floor-inset); }
+.floor-editor-properties { right: var(--floor-inset); width: 260px; }
+.floor-editor h2 { font-size: 15px; margin: 0 0 9px; }
+.floor-editor h3 { font-size: 12px; font-weight: 700; margin: 18px 0 8px; }
+.floor-palette-items { display: grid; gap: 5px; }
+.floor-palette-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 9px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); color: var(--color-text); text-align: left; font: inherit; font-size: 12px; cursor: grab; }
+.floor-palette-item small { color: var(--color-text-muted); white-space: nowrap; font-size: 10px; }
+.floor-palette-item[aria-pressed="true"] { border-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface)); }
+.floor-palette-item:disabled { cursor: default; opacity: .5; }
+.floor-item-id { display: block; overflow-wrap: anywhere; font-size: 10px; margin-top: 5px; }
+.floor-resize-form { margin-top: 16px; border-top: 1px solid var(--color-border); }
+.floor-editor-notice { left: var(--floor-inset); bottom: var(--floor-inset); max-width: min(640px, calc(100% - 150px)); max-height: 105px; overflow: auto; padding: 10px 14px; font-size: 12px; }
+.floor-editor-notice p { margin: 0; }
+.floor-editor-notice p + p, .floor-editor-notice details { margin-top: 5px; }
+.floor-editor-notice summary { cursor: pointer; }
+.floor-editor-notice ul { margin: 6px 0; padding-left: 18px; }
+@media (max-width: 1100px) {
+  .floor-editor-toolbar { align-items: flex-start; }
+  .floor-editor-palette, .floor-editor-properties { top: 140px; }
+  .floor-editor-palette { width: 180px; }
+  .floor-editor-properties { width: 220px; }
+}
+@media (max-width: 760px) {
+  .floor-editor { overflow: auto !important; min-height: 1050px; }
+  .floor-editor-toolbar { position: relative; inset: auto; margin: 12px; flex-wrap: wrap; }
+  .floor-editor-toolbar > div:first-child { width: 100%; }
+  .floor-editor-actions { justify-content: flex-start; }
+  .floor-editor .floor-viewport { top: 150px; bottom: auto; height: 420px; }
+  .floor-editor .floor-camera-controls { top: 540px; bottom: auto; right: 12px; }
+  .floor-editor-palette, .floor-editor-properties { top: 590px; bottom: 90px; width: calc(50% - 18px); }
+  .floor-editor-notice { max-width: calc(100% - 24px); bottom: 12px; }
+}
 .floor-overview .p5-notice { width: fit-content; border-radius: 9px; padding: 7px 11px; background: var(--color-surface); pointer-events: auto; }
 .floor-metrics { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 .floor-metric { display: flex; align-items: center; gap: 9px; min-height: 63px; min-width: 143px; padding: 9px 12px; }

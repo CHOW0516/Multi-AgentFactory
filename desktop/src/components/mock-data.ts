@@ -7,6 +7,7 @@ import type {
   PurchaseRequestOut, QcPlanOut, QcRecordOut, QuotationOut, ScheduleSlotOut, SettingsOut, ShiftOut, StockHoldOut,
   StockMovementOut, TimelineEntry, UserOut, MaintenanceWindowOut,
 } from "../api/types";
+import { demoMachines } from "../figures/demo-events";
 
 const DAY = 86_400_000;
 const startOfToday = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z").getTime();
@@ -26,19 +27,7 @@ export const users: UserOut[] = [
   { id: id("u0000001", 7), name: "Kumar QC", email: "qc@factory.local", role: "qc", backup_approver_id: null, is_active: true },
 ];
 
-export const machines: MachineOut[] = [
-  ["CNC-01", "Haas VF-2 mill", "cnc_mill", "running", 1, 1],
-  ["CNC-02", "Haas VF-4 mill", "cnc_mill", "running", 2, 1],
-  ["CNC-03", "DMG Mori mill", "cnc_mill", "idle", 3, 1],
-  ["LTH-01", "Mazak lathe", "cnc_lathe", "running", 1, 2],
-  ["LTH-02", "Okuma lathe", "cnc_lathe", "setup", 2, 2],
-  ["PRS-01", "Amada press brake", "press", "down", 3, 2],
-  ["WLD-01", "Fronius weld cell", "welding", "idle", 1, 3],
-  ["DBR-01", "Deburr and wash", "finishing", "maintenance", 2, 3],
-].map(([code, name, machineType, status, floorX, floorY], index) => ({
-  id: id("m0000001", index + 1), code: code as string, name: name as string, machine_type: machineType as string,
-  status: status as MachineOut["status"], floor_x: floorX as number, floor_y: floorY as number,
-}));
+export const machines: MachineOut[] = demoMachines;
 
 export const customers: CustomerOut[] = [
   ["ACME", "Acme Automation Sdn Bhd"], ["BRT", "Borneo Rail Tech"], ["CLX", "Coolex Systems"],

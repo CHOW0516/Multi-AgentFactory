@@ -10,7 +10,7 @@ async def test_migrations_go_down_and_up(db_session):
     run_alembic("downgrade", "base")
     run_alembic("upgrade", "head")
     version = await db_session.scalar(text("SELECT version_num FROM alembic_version"))
-    assert version == "0002"
+    assert version == "0003"
 
 
 async def test_seed_creates_demo_factory(db_session):

@@ -99,7 +99,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 input[type="time"] { color-scheme: inherit; }
 :where(.button, .icon-button, .tab, .link-button, .dashboard-disclosure) { transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms cubic-bezier(.16,1,.3,1), box-shadow 160ms ease; }
 :where(.button, .icon-button, .tab, .dashboard-disclosure):not(:disabled):active { transform: translateY(1px) scale(.98); }
-.button { font-weight: 580; }
+.button { font-weight: 580; text-decoration: none; }
 .button-primary:not(:disabled):hover { box-shadow: 0 3px 8px color-mix(in srgb, var(--color-accent) 22%, transparent); }
 .card { background: var(--color-overlay); }
 @media (prefers-reduced-motion: reduce) {

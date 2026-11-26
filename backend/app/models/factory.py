@@ -4,7 +4,8 @@ import uuid
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, Time
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, Time
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import TableBase
@@ -21,6 +22,31 @@ class Machine(TableBase):
     )  # running | idle | setup | down | maintenance
     floor_x: Mapped[int] = mapped_column(Integer, default=0)
     floor_y: Mapped[int] = mapped_column(Integer, default=0)
+    original_floor_x: Mapped[int | None] = mapped_column(Integer)
+    original_floor_y: Mapped[int | None] = mapped_column(Integer)
+
+
+class FloorLayout(TableBase):
+    __tablename__ = "floor_layout"
+    __table_args__ = (CheckConstraint("singleton = 1", name="singleton"),)
+
+    singleton: Mapped[int] = mapped_column(Integer, unique=True, default=1)
+    revision: Mapped[int] = mapped_column(Integer, default=0)
+    origin_x: Mapped[int] = mapped_column(Integer)
+    origin_y: Mapped[int] = mapped_column(Integer)
+    columns: Mapped[int] = mapped_column(Integer)
+    rows: Mapped[int] = mapped_column(Integer)
+    decor: Mapped[list[dict]] = mapped_column(JSONB)
+
+
+class FloorPlacement(TableBase):
+    __tablename__ = "floor_placements"
+    __table_args__ = (CheckConstraint("rotation IN (0, 90, 180, 270)", name="rotation"),)
+
+    machine_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("machines.id"), unique=True)
+    x: Mapped[int] = mapped_column(Integer)
+    y: Mapped[int] = mapped_column(Integer)
+    rotation: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class Shift(TableBase):

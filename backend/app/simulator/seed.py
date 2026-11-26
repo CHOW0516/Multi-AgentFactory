@@ -196,7 +196,8 @@ async def seed(reset: bool = False) -> dict[str, int]:
 
         # ---- machines and calendar ----
         machines = [
-            Machine(code=code, name=name, machine_type=machine_type, status="idle", floor_x=x, floor_y=y)
+            Machine(code=code, name=name, machine_type=machine_type, status="idle", floor_x=x, floor_y=y,
+                    original_floor_x=x, original_floor_y=y)
             for code, name, machine_type, x, y in MACHINES
         ]
         session.add_all(machines)

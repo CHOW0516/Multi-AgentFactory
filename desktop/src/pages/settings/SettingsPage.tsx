@@ -11,6 +11,8 @@ import { formatDate, nameLabel } from "../../components/format";
 import { PageHeader } from "../../components/PageHeader";
 import { QueryState } from "../../components/QueryState";
 import { MachineStatusBadge } from "../../components/StatusBadge";
+import { Link } from "react-router-dom";
+import { Icon } from "../../shell/icons";
 
 type Tab = "users" | "machines" | "calendar" | "thresholds" | "demo";
 const ROLES: Role[] = ["manager", "sales", "planner", "store", "qc", "admin"];
@@ -113,55 +115,21 @@ function UsersTab() {
 
 function MachinesTab() {
   const machinesQuery = useQuery({ queryKey: ["machines"], queryFn: () => apiFetch<MachineOut[]>("/machines") });
-  const queryClient = useQueryClient();
-  const updateMachine = useMutation({
-    mutationFn: ({ machineId, change }: { machineId: string; change: Partial<MachineOut> }) => apiFetch(`/machines/${machineId}`, { method: "PATCH", body: change }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["machines"] }),
-  });
-  const createMachine = useSave("/machines", "POST", "machines");
-  const [draft, setDraft] = useState({ code: "", name: "", machine_type: "", floor_x: "0", floor_y: "0" });
-  const [problem, setProblem] = useState<string | null>(null);
-  const position = (machine: MachineOut, axis: "floor_x" | "floor_y") => (
-    <input type="number" min={0} max={20} className="inline-input" style={{ width: 64 }} aria-label={`${machine.code} ${axis === "floor_x" ? "floor x" : "floor y"}`}
-      defaultValue={machine[axis]} onBlur={(event) => {
-        const value = Number(event.target.value);
-        if (Number.isInteger(value) && value >= 0 && value !== machine[axis]) updateMachine.mutate({ machineId: machine.id, change: { [axis]: value } });
-      }} />
-  );
   const columns: Column<MachineOut>[] = [
     { key: "code", header: "Code", render: (machine) => <strong>{machine.code}</strong>, sortValue: (machine) => machine.code },
     { key: "name", header: "Name", render: (machine) => machine.name },
     { key: "type", header: "Type", render: (machine) => machine.machine_type },
     { key: "status", header: "Status", render: (machine) => <MachineStatusBadge status={machine.status} /> },
-    { key: "x", header: "Floor x", render: (machine) => position(machine, "floor_x") },
-    { key: "y", header: "Floor y", render: (machine) => position(machine, "floor_y") },
   ];
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!draft.code.trim() || !draft.name.trim() || !draft.machine_type.trim()) { setProblem("Code, name and type are needed."); return; }
-    setProblem(null);
-    createMachine.mutate({ ...draft, floor_x: Number(draft.floor_x), floor_y: Number(draft.floor_y) },
-      { onSuccess: () => setDraft({ code: "", name: "", machine_type: "", floor_x: "0", floor_y: "0" }) });
-  }
 
   return (
     <div className="stack">
-      <p className="small muted">Floor x and y place the machine on the factory floor view (grid cells).</p>
-      {updateMachine.isError ? <p className="error-text" role="alert">Could not update: {updateMachine.error.message}</p> : null}
+      <div className="page-actions" style={{ justifyContent: "space-between" }}>
+        <p className="small muted">All registered machines, including machines currently off the floor.</p>
+        <Link className="button button-primary" to="/?edit=floor"><Icon name="factory" size={16} />Edit floor layout<Icon name="chevron-right" size={16} /></Link>
+      </div>
       <DataTable columns={columns} rows={machinesQuery.data} rowKey={(machine) => machine.id} isLoading={machinesQuery.isPending}
         error={machinesQuery.error} onRetry={() => void machinesQuery.refetch()} caption="Machines" />
-      <form className="card compact" onSubmit={submit} aria-label="Add a machine" noValidate>
-        <h2 className="section-title">Add a machine</h2>
-        <div className="grid-3">
-          <div className="field"><label htmlFor="machine-code">Code</label><input id="machine-code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} /></div>
-          <div className="field"><label htmlFor="machine-name">Name</label><input id="machine-name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></div>
-          <div className="field"><label htmlFor="machine-type">Type (matches routing steps)</label><input id="machine-type" value={draft.machine_type} onChange={(event) => setDraft({ ...draft, machine_type: event.target.value })} /></div>
-        </div>
-        {problem ? <p className="error-text" role="alert">{problem}</p> : null}
-        {createMachine.isError ? <p className="error-text" role="alert">{createMachine.error.message}</p> : null}
-        <button type="submit" className="button button-primary" disabled={createMachine.isPending}>Add machine</button>
-      </form>
     </div>
   );
 }

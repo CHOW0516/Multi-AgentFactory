@@ -1,4 +1,4 @@
-import type { FloorMachine } from "../api/types";
+import type { FloorDocument, FloorMachine } from "../api/types";
 import { depthOf, lineSvg, onTop, sideMatrix, topMatrix, towardViewer, type Point3, type Projection } from "../iso/iso-kit";
 import { buildWith, group, outlineRect, panelScrews, slots, track, type GeometryDetail } from "./geometry";
 
@@ -155,7 +155,14 @@ export function floorArt(camera: Projection, detail: GeometryDetail = "full") {
       [-62 + 92 * index, 794, -10.8], [-112 + 92 * index, 794, -10.8],
     ])}"/>`).join("");
   const hallDetails = joints + aisle;
-  function floorDeck(machines: FloorMachine[]) {
+  function floorDeck(machines: FloorMachine[], layout?: FloorDocument) {
+    if (layout) {
+      const { origin_x: x, origin_y: y, columns, rows } = layout;
+      const w = columns * 10, d = rows * 10;
+      const seams = Array.from({ length: Math.floor(w / 190) }, (_, i) => walk(x + (i + 1) * 190, y, 1, d, "p5-joint")).join("") +
+        Array.from({ length: Math.floor(d / 170) }, (_, i) => walk(x, y + (i + 1) * 170, w, 1, "p5-joint")).join("");
+      return floor.block(x, y, -12, w, d, 12, "deck", "lo", 4) + seams;
+    }
     const bounds = { x: 0, y: 0, right: 992, bottom: 690 };
     for (const machine of machines) {
       bounds.x = Math.min(bounds.x, machine.floor_x - 15);
@@ -209,15 +216,15 @@ export function floorArt(camera: Projection, detail: GeometryDetail = "full") {
           block(x, 9, 26, 6, 6, 3, "enamel", "lo")).join("") },
   ];
 
-  function rack(y: number) {
+  function rackBody() {
     const sides = [0, 89].map((x) => block(x, 0, 0, 6, 34, 75, "steel")).join("");
     const shelves = [8, 33, 58].map((z, row) => block(6, 1, z, 83, 33, 4, "steel") +
       [9, 36, 63].map((x, col) => carton(x, 5, z + 4, 20, 25, 11 + (row + col) % 3 * 3)).join("")).join("");
-    return group(floor.position([38, y, 0]), sides + shelves);
+    return sides + shelves;
   }
   const storeArt = {
     position: [95, 189, 30] as Point3,
-    art: rack(149) + rack(204) + group(floor.position([43, 277, 0]),
+    art: group(floor.position([38, 149, 0]), rackBody()) + group(floor.position([38, 204, 0]), rackBody()) + group(floor.position([43, 277, 0]),
       legs(0, 0, 88, 40, 4, 5) + block(0, 0, 4, 88, 40, 4, "kraft") +
       carton(3, 2, 8, 38, 35, 24) + carton(44, 4, 8, 35, 30, 18)),
   };
@@ -244,11 +251,48 @@ export function floorArt(camera: Projection, detail: GeometryDetail = "full") {
     block(13, 6, 8, 3, 4, 14, "steel") + block(13, -7, 8, 3, 4, 14, "steel") +
     block(13, -7, 22, 3, 17, 3, "rubber") + carton(-12, -8, 8, 23, 16, 11);
 
+  function decorArt(kind: string, width: number, height: number): string {
+    const w = width * 10, d = height * 10;
+    const marking = (style: string, inset = 0) => `<path class="${style}" d="${local.shape([
+      [inset, inset, .3], [w - inset, inset, .3], [w - inset, d - inset, .3], [inset, d - inset, .3],
+    ])}"/>`;
+    switch (kind) {
+      case "rack": return rackBody();
+      case "pallet": return legs(0, 0, 88, 40, 4, 5) + block(0, 0, 4, 88, 40, 4, "kraft") +
+        carton(3, 2, 8, 38, 35, 24) + carton(44, 4, 8, 35, 30, 18);
+      case "office": return officeArt.base + officeArt.glazing;
+      case "table": return bench(89, 45, 34, "enamel");
+      case "chair": return block(11, 11, 0, 8, 8, 24, "steel") + block(0, 0, 24, 30, 30, 5, "rubber") +
+        block(0, 0, 29, 30, 5, 28, "rubber") + block(5, 5, 0, 20, 20, 3, "steel");
+      case "computer": return block(0, 0, 0, 40, 25, 3, "enamel") + block(16, 4, 3, 8, 6, 12, "steel") +
+        block(2, 0, 15, 36, 6, 24, "steel") + face(5, 6, 36, outlineRect(0, 0, 30, 18, "p5-display")) +
+        block(3, 16, 3, 34, 8, 2, "rubber");
+      case "wall": return block(0, 0, 0, w, d, 58, "enamel", "lo", 1) + block(0, 0, 58, w, d, 3, "steel", "lo", 1) +
+        block(0, 0, 0, w, d, 5, "steel", "lo", 1);
+      case "loading_wing": return group(local.position([7, 7, 0]), loadingWing());
+      case "dispatch": return block(0, 0, 0, 130, 28, 5, "enamel", "faint", 1) +
+        [12, 55, 105].map((x) => block(x, 9, 5, 6, 6, 21, "blue") + block(x, 9, 26, 6, 6, 3, "enamel")).join("");
+      case "curb": return block(0, 0, 0, w, d, 5, "enamel", "faint", 1);
+      case "road": return marking("floor-road-surface");
+      case "road_mark": return marking("floor-road-mark");
+      case "zone": return marking("floor-zone", 1);
+      case "aisle": return marking("p5-aisle") + `<path class="floor-aisle-edge" d="${local.shape([
+        [0, 0, .4], [w, 0, .4], [w, d, .4], [0, d, .4],
+      ])}"/>`;
+      case "crossing": return Array.from({ length: Math.ceil(w / 13) }, (_, i) => {
+        const x = i * 13;
+        return `<path class="p5-mark" d="${local.shape([[x, 0, .5], [Math.min(x + 5, w), 0, .5], [Math.min(x + 5, w), d, .5], [x, d, .5]])}"/>`;
+      }).join("");
+      default: return "";
+    }
+  }
+
   function cartTrack(x: number, y: number) {
     const stop = y < 366 ? y + 102 : y - 14;
     return track([[147, 304, 0], [190, 304, 0], [190, 390, 0], [x + 56, 390, 0], [x + 56, stop, 0]], (point): Point3 =>
       [...floor.at(point), depthOf([point[0], point[1], 9], camera)]);
   }
 
-  return { showFront, floor, machineArt, genericMachineArt, floorDeck, bayArt, storeArt, officeArt, cartArt, cartTrack, yard };
+  const itemPlane = (w: number, h: number) => local.shape([[0, 0, .1], [w * 10, 0, .1], [w * 10, h * 10, .1], [0, h * 10, .1]]);
+  return { showFront, floor, machineArt, genericMachineArt, floorDeck, bayArt, storeArt, officeArt, cartArt, cartTrack, yard, decorArt, itemPlane };
 }

@@ -2,7 +2,15 @@
 
 from app.models.base import Base, TableBase
 from app.models.catalog import BomLine, Material, Part, Quotation, Routing, Supplier, SupplierItem
-from app.models.factory import Holiday, Machine, MachineEvent, MaintenanceEvent, Shift
+from app.models.factory import (
+    FloorLayout,
+    FloorPlacement,
+    Holiday,
+    Machine,
+    MachineEvent,
+    MaintenanceEvent,
+    Shift,
+)
 from app.models.inventory import PurchaseRequest, StockHold, StockMovement
 from app.models.orders import (
     CLOSED_ORDER_STATES,
@@ -43,6 +51,8 @@ __all__ = [
     "SupplierItem",
     "Holiday",
     "Machine",
+    "FloorLayout",
+    "FloorPlacement",
     "MachineEvent",
     "MaintenanceEvent",
     "Shift",

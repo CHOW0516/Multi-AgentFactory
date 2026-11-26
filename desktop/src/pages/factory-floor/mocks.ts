@@ -1,17 +1,46 @@
 import { ApiError, registerMock } from "../../api/client";
-import type { FloorOut, JobRef, MachineOverview, MachineStatus, Role, TokenResponse } from "../../api/types";
+import type { FloorLayout, FloorOut, JobRef, MachineOverview, MachineStatus, Role, TokenResponse } from "../../api/types";
 import { changeDemoMachine, demoMachineLog, demoMachines, demoMaintenanceHistory, demoOrders } from "../../figures/demo-events";
+import { useAuthStore } from "../../shell/auth-store";
+import { initialMockLayout } from "./mock-layout";
+import { layoutProblems } from "./editor-model";
 
 const statuses = new Set<MachineStatus>(["running", "setup", "idle", "down", "maintenance"]);
 
 let installed = false;
+let savedLayout: FloorLayout | null = null;
+const currentLayout = () => structuredClone(savedLayout ?? initialMockLayout());
 
 // Route discovery runs this after the shared client's eager mock imports have evaluated.
 export function installFloorMocks() {
   if (installed) return;
   installed = true;
+  registerMock("GET", "/floor/layout", currentLayout);
+  registerMock("PUT", "/floor/layout", ({ body }) => {
+    if (useAuthStore.getState().user?.role !== "admin") throw new ApiError(403, "Your role cannot do this");
+    const previous = currentLayout();
+    const input = body as Omit<FloorLayout, "catalog">;
+    if (input.revision !== previous.revision) throw new ApiError(409, "The floor changed in another session. Your draft is kept.");
+    if (input.origin_x !== previous.origin_x || input.origin_y !== previous.origin_y) throw new ApiError(422, "The floor origin cannot change");
+    const errors = layoutProblems(input, previous.catalog);
+    if (errors.length) throw new ApiError(422, errors.join("; "));
+    for (const machine of input.machines) if (demoMachines.some((m) => m.code === machine.code && m.id !== machine.id))
+      throw new ApiError(409, `Machine code ${machine.code} is already registered`);
+    const next: FloorLayout = structuredClone({ ...input, catalog: initialMockLayout().catalog, revision: previous.revision + 1 });
+    for (const placed of input.machines) {
+      const changes = { id: placed.id, code: placed.code, name: placed.name, machine_type: placed.machine_type,
+        floor_x: input.origin_x + placed.x * 10, floor_y: input.origin_y + placed.y * 10 };
+      const existing = demoMachines.find((m) => m.id === placed.id);
+      if (existing) Object.assign(existing, changes);
+      else demoMachines.push({ ...changes, status: "idle", current_order_number: null, part_count: 0, utilisation_today: 0 });
+    }
+    next.catalog = initialMockLayout().catalog;
+    savedLayout = next;
+    return currentLayout();
+  });
   registerMock("GET", "/floor", (): FloorOut => ({
-    machines: demoMachines.map((machine) => ({ ...machine })),
+    machines: currentLayout().machines.map((placement) => ({ ...demoMachines.find((m) => m.id === placement.id)!, rotation: placement.rotation })),
+    layout: currentLayout(),
     orders_in_production: demoOrders.filter((order) => order.status === "IN_PRODUCTION").length,
     pending_approvals: demoOrders.filter((order) => order.status === "WAITING_APPROVAL").length,
   }));

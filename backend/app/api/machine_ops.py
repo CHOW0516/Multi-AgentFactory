@@ -11,6 +11,7 @@ from app.core.audit import write_audit
 from app.core.config import settings
 from app.core.db import get_session
 from app.core.security import current_user, require_roles
+from app.floor import read_layout
 from app.models import Approval, Machine, MachineEvent, MaintenanceEvent, Order, ScheduleSlot
 from app.orchestrator.read_models import schedule_rows
 from app.schemas.api import (
@@ -169,9 +170,14 @@ async def overview(machine_id: uuid.UUID, session=Depends(get_session), user=Dep
 @router.get("/floor", response_model=FloorOut)
 async def floor(session=Depends(get_session), user=Depends(current_user)):
     now = datetime.now(UTC)
+    layout = await read_layout(session)
+    placed = {item.id: item for item in layout.machines}
     machines = await session.scalars(select(Machine).order_by(Machine.code))
     rows = []
     for machine in machines:
+        placement = placed.get(machine.id)
+        if placement is None:
+            continue
         slot = await slot_for(session, machine.id, now)
         order_number = None
         count = None
@@ -195,8 +201,9 @@ async def floor(session=Depends(get_session), user=Depends(current_user)):
                 name=machine.name,
                 machine_type=machine.machine_type,
                 status=machine.status,
-                floor_x=machine.floor_x,
-                floor_y=machine.floor_y,
+                floor_x=layout.origin_x + placement.x * 10,
+                floor_y=layout.origin_y + placement.y * 10,
+                rotation=placement.rotation,
                 current_order_number=order_number,
                 part_count=int(count or 0),
                 utilisation_today=await utilisation(session, machine.id, local_start(now), now),
@@ -204,6 +211,7 @@ async def floor(session=Depends(get_session), user=Depends(current_user)):
         )
     return FloorOut(
         machines=rows,
+        layout=layout.model_dump(mode="json"),
         orders_in_production=await session.scalar(
             select(func.count()).select_from(Order).where(Order.status == "IN_PRODUCTION")
         ),

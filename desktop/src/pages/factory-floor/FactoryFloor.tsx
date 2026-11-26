@@ -1,13 +1,16 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { apiFetch, useLiveEvents } from "../../api/client";
-import type { FloorMachine, FloorOut, LiveEventDataMap, MachineOverview } from "../../api/types";
+import type { FloorLayout, FloorMachine, FloorOut, LiveEventDataMap, MachineOverview } from "../../api/types";
+import { useRole } from "../../components/roles";
 import { QueryNotice } from "../../figures/figure-ui";
 import { useDemoEvents } from "../../figures/demo-events";
 import { Icon } from "../../shell/icons";
 import { useThemeStore } from "../../theme/theme-store";
 import { FloorScene, type CartArrival, type FocusRequest } from "./FloorScene";
 import { MachineDrawer } from "./MachineDrawer";
+import { FloorEditor } from "./FloorEditor";
 import { floorKey, issueDestination, overviewKey, statusNames, withMachineStatus } from "./model";
 import "./factory-floor.css";
 
@@ -52,6 +55,15 @@ function MachineRoster({ machines, onInspect }: { machines: FloorMachine[]; onIn
 
 export function FactoryFloor() {
   const client = useQueryClient();
+  const role = useRole();
+  const { search } = useLocation();
+  const [editing, setEditing] = useState(() => role === "admin" && new URLSearchParams(search).get("edit") === "floor");
+  const [editingLayout, setEditingLayout] = useState<FloorLayout | null>(null);
+  const layout = useQuery({ queryKey: ["floor-layout"], queryFn: ({ signal }) => apiFetch<FloorLayout>("/floor/layout", { signal }),
+    enabled: editing && role === "admin", staleTime: 0, refetchOnWindowFocus: false });
+  useEffect(() => {
+    if (editing && !editingLayout && layout.data && !layout.isFetching && !layout.isError) setEditingLayout(layout.data);
+  }, [editing, editingLayout, layout.data, layout.isFetching, layout.isError]);
   const theme = useThemeStore((state) => state.theme);
   const page = useRef<HTMLElement>(null);
   const restoreFocus = useRef<HTMLElement | SVGElement | null>(null);
@@ -101,14 +113,21 @@ export function FactoryFloor() {
     if (destination) setArrival({ id: message.message_id, x: destination.floor_x, y: destination.floor_y });
   });
 
+  if (editing && role === "admin") {
+    if (editingLayout) return <FloorEditor initial={editingLayout} liveMachines={machines} onClose={() => { setEditing(false); setEditingLayout(null); void floor.refetch(); }} />;
+    return <section className="p5-page"><h1>Edit floor</h1><QueryNotice pending={layout.isFetching} error={layout.isError} retry={() => void layout.refetch()} />
+      <button className="button" type="button" onClick={() => setEditing(false)}>Cancel</button></section>;
+  }
+
   return <section ref={page} className="floor-workspace p5-page iso" data-theme={theme}
     data-inspecting={Boolean(machine) || undefined} onKeyDown={(event) => {
       if (event.key === "Escape" && machine) { event.stopPropagation(); closeInspector(); }
     }}>
     {floor.data && <FloorScene machines={machines} approvals={floor.data.pending_approvals} active={selected ?? hover}
-      onInspect={inspect} onHover={setHover} arrival={arrival} focus={focus} inspecting={Boolean(machine)} />}
+      onInspect={inspect} onHover={setHover} arrival={arrival} focus={focus} inspecting={Boolean(machine)} layout={floor.data.layout} />}
     <header className="floor-overview">
       <h1>Factory floor</h1>
+      {role === "admin" && <button type="button" className="button floor-edit-toggle" aria-pressed="false" onClick={() => { setEditingLayout(null); setEditing(true); }}>Edit floor</button>}
       <dl className="floor-metrics">
         <SceneMetric icon="factory" label="Machines running" value={floor.data ? <>{running}<span> / {machines.length}</span></> : "—"} />
         <SceneMetric icon="orders" label="Orders in production" value={floor.data?.orders_in_production ?? "—"} />

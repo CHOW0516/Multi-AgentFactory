@@ -297,7 +297,7 @@ async def list_machines(session: AsyncSession = Depends(get_session), user: User
 async def create_machine(
     body: MachineIn, session: AsyncSession = Depends(get_session), user: User = Depends(require_roles())
 ):
-    return await create_row(session, user, Machine, body.model_dump())
+    raise HTTPException(409, "Add and place machines in Edit Floor")
 
 
 @router.patch("/machines/{machine_id}", response_model=MachineOut)
@@ -307,10 +307,7 @@ async def update_machine(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(require_roles()),
 ):
-    """Machine status is changed through POST /machines/{id}/status (machine operations), not here."""
-    return await update_row(
-        session, user, await get_or_404(session, Machine, machine_id), changed_values(body)
-    )
+    raise HTTPException(409, "Edit machine properties and placement in Edit Floor")
 
 
 # ---- shifts and holidays ----

@@ -84,8 +84,14 @@ export interface QcRecordOut { id: Uuid; order_id: Uuid; check_name: string; res
 export interface MachineEventOut { id: Uuid; event_type: string; value: string; happened_at: IsoDateTime }
 export interface JobRef { order_id: Uuid; order_number: string; start_at: IsoDateTime; end_at: IsoDateTime; quantity: DecimalString }
 export interface MachineOverview { machine: MachineOut; current_job: JobRef | null; next_jobs: JobRef[]; utilisation_today: number; recent_events: MachineEventOut[]; maintenance_history: MaintenanceWindowOut[] }
-export interface FloorMachine { id: Uuid; code: string; name: string; machine_type: string; status: MachineStatus; floor_x: number; floor_y: number; current_order_number: string | null; part_count: number; utilisation_today: number }
-export interface FloorOut { machines: FloorMachine[]; orders_in_production: number; pending_approvals: number }
+export interface FloorMachine { id: Uuid; code: string; name: string; machine_type: string; status: MachineStatus; floor_x: number; floor_y: number; rotation?: number; current_order_number: string | null; part_count: number; utilisation_today: number }
+export interface FloorOut { machines: FloorMachine[]; orders_in_production: number; pending_approvals: number; layout?: FloorLayout }
+export interface FloorCatalogItem { kind: string; label: string; category: "Machines" | "Structure" | "Furniture" | "Markings"; width: number; height: number; solid: boolean; resizable: boolean }
+export interface GridPlacement { id: Uuid; x: number; y: number; rotation: 0 | 90 | 180 | 270 }
+export interface LayoutMachine extends GridPlacement { code: string; name: string; machine_type: string }
+export interface LayoutDecor extends GridPlacement { kind: string; name: string; width: number; height: number }
+export interface FloorDocument { origin_x: number; origin_y: number; columns: number; rows: number; machines: LayoutMachine[]; decor: LayoutDecor[] }
+export interface FloorLayout extends FloorDocument { revision: number; catalog: FloorCatalogItem[] }
 export interface NotificationOut { id: Uuid; kind: string; title: string; body: string | null; link: string | null; read_at: IsoDateTime | null; created_at: IsoDateTime }
 
 // ---- WebSocket (WS /ws) ----

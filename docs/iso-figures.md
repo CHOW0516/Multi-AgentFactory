@@ -24,6 +24,8 @@ Messages per minute and failures observed today are based on the events received
 
 ## Run and verify
 
+The admin-only visual floor editor, its catalog, migration/rollback behavior and acceptance checks are documented in [Visual factory floor editor](floor-editor.md).
+
 In `desktop`, install the locked dependencies with `npm ci`. To run the P5 mock demo in PowerShell:
 
 ```powershell

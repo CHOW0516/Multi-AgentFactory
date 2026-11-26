@@ -11,6 +11,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.floor import LayoutOut
+
 Role = Literal["manager", "sales", "planner", "store", "qc", "admin"]
 MachineStatus = Literal["running", "idle", "setup", "down", "maintenance"]
 
@@ -620,6 +622,7 @@ class FloorMachine(ApiModel):
     status: MachineStatus
     floor_x: int
     floor_y: int
+    rotation: int = 0
     current_order_number: str | None
     part_count: int
     utilisation_today: float
@@ -629,6 +632,7 @@ class FloorOut(ApiModel):
     machines: list[FloorMachine]
     orders_in_production: int
     pending_approvals: int
+    layout: LayoutOut | None = None
 
 
 class NotificationOut(ApiModel):

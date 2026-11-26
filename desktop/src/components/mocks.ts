@@ -1,6 +1,6 @@
 // Mock master data shared by several pages (P4). Read-only lists plus simple create/update.
 import { ApiError, registerMock } from "../api/client";
-import type { HolidayOut, MachineOut, ShiftOut, UserOut } from "../api/types";
+import type { HolidayOut, ShiftOut, UserOut } from "../api/types";
 import { appSettings, customers, holidays, machines, parts, shifts, users } from "./mock-data";
 
 registerMock("GET", "/users", () => users);
@@ -21,17 +21,8 @@ registerMock("PATCH", "/users/:userId", ({ params, body }) => {
 registerMock("GET", "/customers", () => customers);
 registerMock("GET", "/parts", () => parts);
 registerMock("GET", "/machines", () => machines);
-registerMock("POST", "/machines", ({ body }) => {
-  const machine: MachineOut = { id: `0b000000-0000-4000-8000-${String(machines.length + 1).padStart(12, "0")}`, status: "idle",
-    ...(body as Omit<MachineOut, "id" | "status">) };
-  machines.push(machine);
-  return machine;
-});
-registerMock("PATCH", "/machines/:machineId", ({ params, body }) => {
-  const machine = machines.find((candidate) => candidate.id === params.machineId);
-  if (!machine) throw new ApiError(404, "Machine not found");
-  return Object.assign(machine, body as Partial<MachineOut>);
-});
+registerMock("POST", "/machines", () => { throw new ApiError(409, "Add and place machines in Edit Floor"); });
+registerMock("PATCH", "/machines/:machineId", () => { throw new ApiError(409, "Edit machine properties and placement in Edit Floor"); });
 registerMock("GET", "/shifts", () => shifts);
 registerMock("POST", "/shifts", ({ body }) => {
   const shift: ShiftOut = { id: `0c000000-0000-4000-8000-${String(shifts.length + 1).padStart(12, "0")}`, ...(body as Omit<ShiftOut, "id">) };

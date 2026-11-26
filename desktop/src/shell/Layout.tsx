@@ -47,7 +47,10 @@ export function Layout({ routes, children }: { routes: PageRoute[]; children: Re
         <div className="shell-user"><span className="shell-avatar" aria-hidden="true">{initials}</span>
           <span><strong>{user?.name}</strong><small>{user?.role}</small></span>
         </div>
-        <button className="icon-button" type="button" onClick={logout} aria-label="Log out" data-tooltip="Log out">
+        <button className="icon-button" type="button" onClick={() => {
+          const event = new CustomEvent("workspace-leave", { cancelable: true, detail: { proceed: logout } });
+          if (window.dispatchEvent(event)) logout();
+        }} aria-label="Log out" data-tooltip="Log out">
           <Icon name="logout" />
         </button>
       </header>

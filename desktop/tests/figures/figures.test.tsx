@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useRef } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { __answerFromMockForTests, emitMockEvent } from "../../src/api/client";
 import type { AgentMessageEventData, FloorOut } from "../../src/api/types";
@@ -51,7 +52,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const provide = (view: React.ReactNode) => <QueryClientProvider client={client}>{view}</QueryClientProvider>;
+const provide = (view: React.ReactNode) => <QueryClientProvider client={client}><MemoryRouter>{view}</MemoryRouter></QueryClientProvider>;
 
 it("previews three records and expands and collapses the remaining history", () => {
   render(<CompactList items={["Job 1", "Job 2", "Job 3", "Job 4", "Job 5"]}

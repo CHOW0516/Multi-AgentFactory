@@ -33,6 +33,14 @@ function createWindow(): void {
     if (url.startsWith("http")) void shell.openExternal(url);
     return { action: "deny" };
   });
+  window.webContents.on("will-prevent-unload", (event) => {
+    const choice = dialog.showMessageBoxSync(window, {
+      type: "question", buttons: ["Keep editing", "Discard changes"], defaultId: 0, cancelId: 0,
+      title: "Unsaved floor changes", message: "Discard unsaved floor changes and close?",
+      detail: "The last saved layout will be kept.",
+    });
+    if (choice === 1) event.preventDefault();
+  });
   if (DEV_SERVER_URL) {
     void window.loadURL(DEV_SERVER_URL);
   } else {
