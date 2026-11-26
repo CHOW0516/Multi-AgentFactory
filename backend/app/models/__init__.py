@@ -20,6 +20,7 @@ from app.models.orders import (
     SourceDocument,
 )
 from app.models.people import Customer, User
+from app.models.simulation import SimLine
 from app.models.system import (
     AgentMessage,
     AppSetting,
@@ -63,6 +64,7 @@ __all__ = [
     "SourceDocument",
     "Customer",
     "User",
+    "SimLine",
     "AgentMessage",
     "AppSetting",
     "AuditLog",

@@ -1,0 +1,84 @@
+/* Line simulator page. Uses only theme tokens so light and dark both work. */
+.ls-page { --ls-job-0: #2558d4; --ls-job-1: #d9762b; --ls-job-2: #2e9d57; --ls-job-3: #9b4fd1; --ls-job-4: #c4382f; --ls-job-5: #1f9aa6; }
+:root[data-theme="dark"] .ls-page { --ls-job-0: #7fa3ff; --ls-job-1: #f0a35e; --ls-job-2: #4cc27a; --ls-job-3: #c08ef0; --ls-job-4: #ef6b62; --ls-job-5: #4dc8d3; }
+
+.ls-toolbar { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
+.ls-name { min-width: 180px; font-weight: 600; }
+.ls-toolbar-gap { flex: 1; }
+.ls-select { padding: 8px 10px; border-radius: var(--radius-small); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 13px; }
+.ls-clock { padding: 6px 10px; border-radius: var(--radius-small); background: var(--color-surface-muted); min-width: 118px; text-align: center; }
+
+.ls-layout { display: grid; grid-template-columns: 150px minmax(0, 1fr) 340px; gap: var(--space-3); align-items: start; }
+@media (max-width: 1200px) { .ls-layout { grid-template-columns: 150px minmax(0, 1fr); } .ls-side { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .ls-layout { grid-template-columns: 1fr; } }
+
+.ls-palette { display: flex; flex-direction: column; gap: 6px; }
+.ls-palette .section-title { margin-bottom: 4px; }
+.ls-palette-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-small); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 13px; text-align: left; cursor: grab; }
+.ls-palette-item:hover { border-color: var(--color-accent); background: var(--color-accent-soft); }
+.ls-palette-item:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ls-palette-mark { width: 12px; height: 12px; border-radius: 3px; flex: none; background: var(--color-accent); }
+.ls-palette-source { background: var(--status-running); border-radius: 50%; }
+.ls-palette-sink { background: var(--color-text-muted); border-radius: 50%; }
+.ls-legend { display: flex; flex-direction: column; gap: 4px; margin: var(--space-3) 0 0; }
+.ls-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+.ls-canvas-wrap { padding: 0; overflow: hidden; }
+.ls-canvas { display: block; width: 100%; height: auto; touch-action: none; user-select: none; background: var(--color-surface); }
+.ls-canvas:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.ls-grid-dot { fill: var(--color-border); }
+.ls-arrow { fill: var(--color-text-muted); }
+
+.ls-link { cursor: pointer; }
+.ls-link-hit { fill: none; stroke: transparent; stroke-width: 14; }
+.ls-link-line { fill: none; stroke: var(--color-text-muted); stroke-width: 2; }
+.ls-link.is-selected .ls-link-line { stroke: var(--color-accent); stroke-width: 3; }
+.ls-link-draft { stroke-dasharray: 6 5; stroke: var(--color-accent); pointer-events: none; }
+
+.ls-block { cursor: grab; }
+.ls-block-body { fill: var(--color-surface); stroke: var(--color-border); stroke-width: 1.5; }
+.ls-source .ls-block-body, .ls-sink .ls-block-body { fill: var(--color-surface-muted); }
+.ls-block.is-selected .ls-block-body { stroke: var(--color-accent); stroke-width: 2.5; }
+.ls-block.is-bottleneck .ls-block-body { stroke: var(--color-danger); stroke-width: 3; }
+.ls-block-tag { font-size: 11px; font-weight: 700; letter-spacing: .06em; fill: var(--color-text-muted); }
+.ls-block-name { font-size: 13px; font-weight: 600; fill: var(--color-text); }
+.ls-block-stripe { fill: var(--color-border); }
+.ls-source .ls-block-stripe { fill: var(--status-running); }
+.ls-sink .ls-block-stripe { fill: var(--color-text-muted); }
+.ls-state-running { fill: var(--status-running); background: var(--status-running); }
+.ls-state-setup { fill: var(--status-setup); background: var(--status-setup); }
+.ls-state-idle { fill: var(--status-idle); background: var(--status-idle); }
+.ls-state-down { fill: var(--status-down); background: var(--status-down); }
+.ls-port { fill: var(--color-accent); stroke: var(--color-surface); stroke-width: 2; cursor: crosshair; }
+.ls-port:hover { r: 9; }
+.ls-port-in { fill: var(--color-text-muted); }
+.ls-queue { fill: var(--color-accent-soft); }
+.ls-queue-text { font-size: 11px; font-weight: 700; fill: var(--color-accent); text-anchor: middle; }
+.ls-dot { stroke: var(--color-surface); stroke-width: 1.5; pointer-events: none; }
+.ls-job-0 { fill: var(--ls-job-0); background: var(--ls-job-0); }
+.ls-job-1 { fill: var(--ls-job-1); background: var(--ls-job-1); }
+.ls-job-2 { fill: var(--ls-job-2); background: var(--ls-job-2); }
+.ls-job-3 { fill: var(--ls-job-3); background: var(--ls-job-3); }
+.ls-job-4 { fill: var(--ls-job-4); background: var(--ls-job-4); }
+.ls-job-5 { fill: var(--ls-job-5); background: var(--ls-job-5); }
+
+.ls-side { max-height: calc(100vh - 230px); overflow-y: auto; }
+.ls-side .tabs { margin-bottom: var(--space-4); }
+.ls-side .field input, .ls-side .field select { width: 100%; box-sizing: border-box; }
+.ls-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-3); }
+.ls-field-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--space-2); }
+.ls-field-grid-3 .field { margin-bottom: 0; }
+.ls-job { box-shadow: none; }
+.ls-job-swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.ls-problem-list { margin: 6px 0 0; padding-left: 18px; }
+
+.ls-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.ls-tiles > div { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-small); }
+.ls-tile-value { font-size: 17px; font-weight: 650; margin-top: 2px; overflow-wrap: anywhere; }
+.ls-table-wrap { overflow-x: auto; }
+.ls-table { font-size: 13px; }
+.ls-table td, .ls-table th { white-space: nowrap; }
+.ls-table th, .ls-table td { padding: 7px 8px; }
+.ls-row-bottleneck td { color: var(--color-danger); font-weight: 600; }
+.ls-bar { width: 100%; height: 5px; border-radius: 3px; background: var(--color-surface-muted); margin-bottom: 3px; overflow: hidden; }
+.ls-bar span { display: block; height: 100%; background: var(--color-accent); }

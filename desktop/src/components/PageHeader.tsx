@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { Icon } from "../shell/icons";
 
 const pageIcons: Record<string, string> = { Schedule: "schedule", Dashboards: "dashboards", Settings: "settings",
-  Approvals: "approvals", Orders: "orders", Materials: "materials", Quotations: "quotations", History: "history", Quality: "quality" };
+  Approvals: "approvals", Orders: "orders", Materials: "materials", Quotations: "quotations", History: "history", Quality: "quality",
+  "Line simulator": "line" };
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
