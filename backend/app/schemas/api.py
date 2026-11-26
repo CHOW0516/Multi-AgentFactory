@@ -514,6 +514,15 @@ class TimelineEntry(ApiModel):
     actor: str | None
 
 
+class AttentionItem(ApiModel):
+    severity: Literal["high", "medium"]
+    kind: str
+    title: str
+    detail: str | None
+    link: str
+    action: str
+
+
 class KpiTile(ApiModel):
     key: str
     label: str

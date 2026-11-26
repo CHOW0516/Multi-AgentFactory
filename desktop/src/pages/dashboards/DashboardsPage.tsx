@@ -8,6 +8,7 @@ import { KpiTile } from "../../components/KpiTile";
 import { PageHeader } from "../../components/PageHeader";
 import { QueryState } from "../../components/QueryState";
 import { ChartCard, type ChartDefinition } from "./ChartCard";
+import { NeedsAttention } from "./NeedsAttention";
 import { Icon } from "../../shell/icons";
 
 // Chart names agreed with P3 (see docs/requests/p4.md). A chart the backend lacks shows "No data".
@@ -37,6 +38,7 @@ export function DashboardsPage() {
   return (
     <div className="stack dashboard-page">
       <PageHeader title="Dashboards" subtitle="How orders, machines and agents are doing." />
+      <NeedsAttention />
       <div className="filter-bar dashboard-range" role="group" aria-label="Date range">
         <div className="field"><label htmlFor="dashboard-from">From</label>
           <DatePicker id="dashboard-from" value={range.from} max={range.to} required onChange={(from) => setRange({ ...range, from })} /></div>

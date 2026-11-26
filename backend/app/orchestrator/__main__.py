@@ -4,7 +4,7 @@ import logging
 from app.core.logging import setup_logging
 from app.messaging import RESULT_ROUTING_KEY, RESULTS_QUEUE, get_broker, run_consumer
 
-from . import machine_replans, workflow
+from . import attention, machine_replans, workflow
 from .outbox import drain_events
 
 EVENTS = [
@@ -28,7 +28,12 @@ async def handle(message):
 
 async def poll():
     while True:
-        for operation in (workflow.tick, machine_replans.advance, drain_events):
+        for operation in (
+            workflow.tick,
+            machine_replans.advance,
+            attention.send_morning_briefing,
+            drain_events,
+        ):
             try:
                 await operation()
             except Exception:

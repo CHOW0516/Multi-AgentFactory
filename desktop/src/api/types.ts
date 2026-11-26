@@ -73,6 +73,7 @@ export interface ChatRequest { message: string; order_id?: Uuid | null }
 export interface AgentSummary { name: AgentName; job_scope: string; uses_llm: boolean; queue_depth: number; in_progress: number; success_rate_today: number; average_latency_ms: number; tokens_today: number; cost_today_usd: number; dead_letter_count: number; last_seen: IsoDateTime | null }
 export interface AgentMessageOut { message_id: Uuid; correlation_id: Uuid | null; order_id: Uuid | null; message_type: "task" | "result" | "event"; from_agent: AgentName; to_agent: AgentName | null; action: string; status: "ok" | "partial" | "failed" | null; payload: Record<string, unknown>; notes: string | null; latency_ms: number | null; tokens_in: number; tokens_out: number; cost_usd: DecimalString; sent_at: IsoDateTime }
 export interface TimelineEntry { at: IsoDateTime; kind: "state_change" | "agent_message" | "human_action" | "document"; title: string; detail: Record<string, unknown> | null; actor: string | null }
+export interface AttentionItem { severity: "high" | "medium"; kind: string; title: string; detail: string | null; link: string; action: string }
 export interface KpiTile { key: string; label: string; value: number; unit: string | null; trend: number | null }
 export interface ChartSeries { name: string; points: [string, number][] }
 export interface ChartOut { name: string; series: ChartSeries[] }
