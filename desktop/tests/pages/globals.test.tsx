@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { emitMockEvent } from "../../src/api/client";
 import type { LiveEvent } from "../../src/api/types";
 import { useChatPanel } from "../../src/components/chat-store";
+import { ChatMarkdown, parseBlocks } from "../../src/global/chat/ChatMarkdown";
 import { ChatPanel } from "../../src/global/chat/ChatPanel";
 import { splitToolLines, type StreamChat } from "../../src/global/chat/stream";
 import LiveRefresh, { queryKeysFor } from "../../src/global/live-refresh";
@@ -43,6 +44,32 @@ describe("chat", () => {
 
   it("splits tool lines from the answer", () => {
     expect(splitToolLines("[tool] a()\nHello\n[tool] b()\nworld")).toEqual({ tools: ["a()", "b()"], answer: "Hello\nworld" });
+  });
+
+  it("shows a Markdown table, list and bold text formatted", () => {
+    const reply = "The factory has **7 machines**:\n\n| Code | Status |\n| :--- | :--- |\n| **LATHE-01** | Running |\n| MILL-01 | Idle |\n\n- one\n- two";
+    const { container } = render(<ChatMarkdown text={reply} />);
+    expect(container.querySelector("table")).not.toBeNull();
+    expect(screen.getByRole("columnheader", { name: "Code" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "LATHE-01" }).querySelector("strong")).not.toBeNull();
+    expect(screen.getAllByRole("row")).toHaveLength(3);
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(container.textContent).not.toContain("|");
+    expect(container.textContent).not.toContain("**");
+    expect(screen.getByRole("cell", { name: "Running" }).querySelector(".status-dot")).not.toBeNull();
+  });
+
+  it("splits Markdown into blocks", () => {
+    expect(parseBlocks("## Title\nline one\nline two\n\n1. a\n2. b").map((block) => block.kind)).toEqual(["heading", "paragraph", "numbers"]);
+    expect(parseBlocks("| a | b |\n| 1 | 2 |")).toEqual([{ kind: "table", header: [], rows: [["a", "b"], ["1", "2"]] }]);
+  });
+
+  it("shows a tool used twice once, with a count", async () => {
+    const stream: StreamChat = async (_message, _orderId, onChunk) => { onChunk("[tool] get_machine_overview\n[tool] get_machine_overview\nDone."); };
+    act(() => useChatPanel.setState({ open: true, orderId: null, orderLabel: null }));
+    render(<ChatPanel stream={stream} />);
+    await userEvent.type(screen.getByLabelText("Message"), "Machines?{Enter}");
+    await waitFor(() => expect(screen.getByText("⚙ get_machine_overview ×2")).toBeInTheDocument());
   });
 });
 

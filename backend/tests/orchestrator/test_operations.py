@@ -48,6 +48,45 @@ async def test_chat_refuses_mutation(client, auth_headers, fake_ai, db_session):
     assert await db_session.scalar(select(func.count()).select_from(LlmCall)) == 2
 
 
+async def test_chat_finds_machine_by_code(client, auth_headers, fake_ai, db_session):
+    machine = Machine(code="QC-02", name="QC Station 2", machine_type="qc_station", status="idle")
+    db_session.add(machine)
+    await db_session.commit()
+    fake_ai.add_response(
+        tool_uses=[{"id": "list", "name": "list_machines", "input": {}}], stop_reason="tool_use"
+    )
+    fake_ai.add_response(
+        tool_uses=[{"id": "one", "name": "get_machine_overview", "input": {"machine_code": "qc-02"}}],
+        stop_reason="tool_use",
+    )
+    fake_ai.add_response(text="QC-02 is idle.")
+    response = await client.post(
+        "/api/chat", headers=auth_headers("manager"), json={"message": "Status of QC-02?"}
+    )
+    assert response.status_code == 200 and "QC-02 is idle." in response.text
+    listed = json.loads(fake_ai.requests[1]["messages"][-1]["content"])
+    assert any(row["code"] == "QC-02" and row["status"] == "idle" for row in listed)
+    overview = json.loads(fake_ai.requests[2]["messages"][-1]["content"])
+    assert "error" not in overview
+
+
+async def test_chat_unknown_machine_code_and_last_round(client, auth_headers, fake_ai):
+    from app.api.chat import MAX_ROUNDS
+
+    for index in range(MAX_ROUNDS):
+        fake_ai.add_response(
+            text="Partial answer." if index == MAX_ROUNDS - 1 else "",
+            tool_uses=[
+                {"id": f"call{index}", "name": "get_machine_overview", "input": {"machine_code": "NOPE-9"}}
+            ],
+            stop_reason="tool_use",
+        )
+    response = await client.post("/api/chat", headers=auth_headers("manager"), json={"message": "NOPE-9?"})
+    assert "No machine with code NOPE-9" in fake_ai.requests[1]["messages"][-1]["content"]
+    assert "Do not call more tools" in json.dumps(fake_ai.requests[-1]["messages"][-1])
+    assert len(fake_ai.requests) == MAX_ROUNDS and "Partial answer." in response.text
+
+
 def test_ws_role_and_notification_recipients():
     store, manager = uuid.uuid4(), uuid.uuid4()
     envelope = {
