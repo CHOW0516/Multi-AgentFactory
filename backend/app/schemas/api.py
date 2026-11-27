@@ -273,6 +273,7 @@ class DeliveryConfidence(ApiModel):
     likely_date: date  # half the runs ship by this date
     safe_date: date  # 9 in 10 runs ship by this date
     runs: int
+    low_history: bool = False  # a machine of this order has too few finished jobs to judge it well
 
 
 class PlanOptionOut(ApiModel):

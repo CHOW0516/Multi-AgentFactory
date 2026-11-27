@@ -3,12 +3,12 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.core.config import settings
 from app.core.db import session_scope
 from app.messaging import publish_task
-from app.models import AgentMessage, AuditLog, Machine, WorkflowRun
+from app.models import AgentMessage, AuditLog, Machine, MaintenanceEvent, WorkflowRun
 from app.schemas.contracts import MachineUnavailable, ReplanForMachineResult
 
 from .outbox import notify
@@ -86,6 +86,24 @@ async def queue_late_order(session, order, data, message_id):
     )
 
 
+async def machine_back(session, data, now) -> bool:
+    """A breakdown replan that is no longer needed: the machine runs and nothing blocks it now or later."""
+    if data.get("late_order_id"):
+        return False
+    machine = await session.get(Machine, uuid.UUID(data["machine_id"]))
+    if machine is None or machine.status in ("down", "maintenance"):
+        return False
+    blocking = await session.scalar(
+        select(MaintenanceEvent.id)
+        .where(
+            MaintenanceEvent.machine_id == machine.id,
+            or_(MaintenanceEvent.end_at.is_(None), MaintenanceEvent.end_at > now),
+        )
+        .limit(1)
+    )
+    return blocking is None
+
+
 async def advance(now=None):
     now = now or datetime.now(UTC)
     async with session_scope() as session:
@@ -111,6 +129,9 @@ async def advance(now=None):
                 .limit(1)
             )
             if previous and previous.sent_at + timedelta(seconds=settings.task_default_timeout_seconds) > now:
+                continue
+            if previous is None and await machine_back(session, job.after, now):
+                job.action = "skipped"  # the machine is running again before the replan even started
                 continue
             attempt = previous.attempt + 1 if previous else 1
             if attempt > settings.task_max_attempts:

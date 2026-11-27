@@ -15,6 +15,8 @@ export function ConfidenceText({ confidence }: { confidence: DeliveryConfidence 
         ? <strong className={`confidence-${level}`}>{confidence.chance_on_time}% on time</strong> : null}
       <span className="muted"> Likely {formatDate(confidence.likely_date)}, 9 in 10 by {formatDate(confidence.safe_date)}
         {" "}({confidence.runs} runs with random breakdowns)</span>
+      {confidence.low_history
+        ? <span className="muted"> Rough guess: some machines have few finished jobs on record.</span> : null}
     </span>
   );
 }

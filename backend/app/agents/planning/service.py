@@ -11,9 +11,10 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import delete, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.maintenance.repair import expected_end, typical_repair_hours
 from app.agents.material.service import UNKNOWN_READY_DATE, forecast, order_requirements, requirements
 from app.agents.planning.calendar import Window, calendar, overlaps
-from app.agents.planning.confidence import SimJob, as_dict, confidence_for
+from app.agents.planning.confidence import SimJob, as_dict, confidence_for, promise_date
 from app.agents.planning.options import HOUR, Candidate, Scenario, propose, slot_snapshot
 from app.agents.planning.solver import Job
 from app.api.settings import effective_settings
@@ -65,14 +66,42 @@ async def maintenance_windows(
             or_(MaintenanceEvent.end_at.is_(None), MaintenanceEvent.end_at > start),
         )
     )
+    rows = list(rows)
+    # An open breakdown ends after the machine's typical repair, not never (planned work without
+    # an end still blocks until someone sets one).
+    now = datetime.now(UTC)
+    min_minutes = (await effective_settings(session))["breakdown_min_minutes"]
+    repairs = await typical_repair_hours(session, [machine.id for machine in machines], now, min_minutes)
     blocks: dict[UUID, list[Window]] = defaultdict(list)
+    short_stop = set()  # machines whose stop is still too short to count as a breakdown
     for row in rows:
-        blocks[row.machine_id].append((row.start_at, row.end_at or FAR_FUTURE))
+        end = row.end_at
+        if (
+            end is None
+            and row.maintenance_type == "breakdown"
+            and now - row.start_at < timedelta(minutes=min_minutes)
+        ):
+            short_stop.add(row.machine_id)
+            continue
+        if end is None:
+            end = (
+                expected_end(row.start_at, max(now, start), repairs.get(row.machine_id))
+                if row.maintenance_type == "breakdown"
+                else FAR_FUTURE
+            )
+        blocks[row.machine_id].append((row.start_at, end))
     for machine in machines:
+        if machine.id in short_stop:
+            continue
         if machine.status in {"down", "maintenance"} and not any(
             left <= start < right for left, right in blocks[machine.id]
         ):
-            blocks[machine.id].append((start, FAR_FUTURE))
+            end = (
+                expected_end(start, start, repairs.get(machine.id))
+                if machine.status == "down"
+                else FAR_FUTURE
+            )
+            blocks[machine.id].append((start, end))
     return dict(blocks)
 
 
@@ -508,7 +537,7 @@ async def lock_plan(session: AsyncSession, order_id: UUID, option_id: UUID | Non
     await clear_proposals(session, order_id)
     order = await session.get(Order, order_id, with_for_update={"key_share": True})
     old_finish = order.promised_date
-    order.promised_date = option.finish_date
+    order.promised_date = await promise_date(session, option, order, datetime.now(UTC))
     await write_audit(
         session,
         "planning",
@@ -518,7 +547,7 @@ async def lock_plan(session: AsyncSession, order_id: UUID, option_id: UUID | Non
         {"promised_date": str(old_finish) if old_finish is not None else None},
         {
             "plan_option_id": str(option.id),
-            "promised_date": str(option.finish_date),
+            "promised_date": str(order.promised_date),
             "replaced_slots": [str(slot.id) for slot in replace],
         },
     )

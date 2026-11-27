@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.planning.confidence import promise_date
 from app.core.audit import write_audit
 from app.models import CustomerMessage, Order, OrderLine, PlanOption
 from app.schemas.contracts import DraftCustomerReplyResult
@@ -48,6 +49,8 @@ async def draft_customer_reply(
         option = await session.get(PlanOption, plan_option_id)
         if option is None or option.order_id != order_id:
             raise ValueError("Plan option not found for this order")
+        # The date to promise may sit later than the solver's date (setting promise_confidence_percent).
+        full_date = await promise_date(session, option, order)
         if option.option_type == "split":
             if option.split_quantity_first is None or option.split_finish_date_first is None:
                 raise ValueError("Split option is missing its first delivery quantity or date")
@@ -61,14 +64,14 @@ async def draft_customer_reply(
             facts = (
                 f"For purchase order {reference}, we can deliver {first_quantity.normalize():f} "
                 f"by {option.split_finish_date_first:%d %B %Y} and the remaining "
-                f"{(total - first_quantity).normalize():f} by {option.finish_date:%d %B %Y}."
+                f"{(total - first_quantity).normalize():f} by {full_date:%d %B %Y}."
             )
-        elif order.due_date is not None and option.finish_date > order.due_date:
+        elif order.due_date is not None and full_date > order.due_date:
             scenario = "propose a new date"
-            facts = f"We can deliver purchase order {reference} by {option.finish_date:%d %B %Y}."
+            facts = f"We can deliver purchase order {reference} by {full_date:%d %B %Y}."
         else:
             scenario = "confirm"
-            facts = f"We confirm delivery of purchase order {reference} by {option.finish_date:%d %B %Y}."
+            facts = f"We confirm delivery of purchase order {reference} by {full_date:%d %B %Y}."
 
     # A fixed courtesy line per case. This replaced an AI call per reply: the AI was not allowed to
     # use dates, quantities, names or promises, so it could only rephrase these lines.

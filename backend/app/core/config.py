@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     currency: str = "MYR"
     stock_count_warning_days: int = 30
     planning_solver_time_limit_seconds: int = 30
+    # A machine stop shorter than this is not treated as a breakdown for replanning.
+    breakdown_min_minutes: float = 10
+    # Which date to promise customers: 0 = the solver's date (assumes nothing goes wrong),
+    # 50 = the date half the delivery-confidence replays make, 90 = the date 9 in 10 make.
+    promise_confidence_percent: float = 0
 
     # Simulator
     sim_send_pos: bool = True  # false: the simulator only runs the machines
@@ -127,6 +132,8 @@ EDITABLE_SETTING_KEYS = [
     "overtime_rate_per_hour",
     "stock_count_warning_days",
     "planning_solver_time_limit_seconds",
+    "breakdown_min_minutes",
+    "promise_confidence_percent",
     "llm_daily_cost_limit_usd",
 ]
 

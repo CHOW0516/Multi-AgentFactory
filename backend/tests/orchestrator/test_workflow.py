@@ -246,7 +246,7 @@ async def test_reminder_and_escalation(db_session, fake_broker, client, auth_hea
 
 async def test_machine_unavailability_creates_replan_approval(db_session, fake_broker):
     order = await make_order(db_session, status="CONFIRMED")
-    machine = Machine(code="M-1", machine_type="mill", name="Mill")
+    machine = Machine(code="M-1", machine_type="mill", name="Mill", status="down")
     option = PlanOption(order_id=order.id, option_type="delay", finish_date=date(2026, 12, 2))
     db_session.add_all([machine, option])
     await db_session.commit()

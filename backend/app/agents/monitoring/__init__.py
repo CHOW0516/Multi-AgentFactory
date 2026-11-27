@@ -59,7 +59,12 @@ class OpcUaSource:
 
 
 async def slot_for(session, machine_id, at):
-    return await session.scalar(
+    """The job a machine event belongs to: the latest job that has started.
+
+    After its planned end a job only keeps receiving events while it is unfinished (running late).
+    Once it has reported its full quantity, later events between jobs belong to no order.
+    """
+    slot = await session.scalar(
         select(ScheduleSlot)
         .where(
             ScheduleSlot.machine_id == machine_id,
@@ -69,6 +74,23 @@ async def slot_for(session, machine_id, at):
         .order_by(ScheduleSlot.start_at.desc(), ScheduleSlot.id)
         .limit(1)
     )
+    if slot is None or slot.end_at > at:
+        return slot
+    reported = await session.scalar(
+        select(MachineEvent.value)
+        .where(
+            MachineEvent.machine_id == machine_id,
+            MachineEvent.order_id == slot.order_id,
+            MachineEvent.event_type == "count",
+            MachineEvent.happened_at >= slot.start_at,
+            MachineEvent.happened_at <= at,
+        )
+        .order_by(MachineEvent.happened_at.desc())
+        .limit(1)
+    )
+    if reported is not None and int(reported) >= slot.quantity:
+        return None
+    return slot
 
 
 def minutes_behind(slot, count: int, at: datetime) -> int:
