@@ -2,7 +2,7 @@ import "./line-simulator.css";
 // Line simulator: build your own machine line on a canvas and watch orders flow through it.
 // A sandbox: nothing here changes real machines, orders or the schedule. No AI is used.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../../api/client";
 import type { MachineOut } from "../../api/types";
 import { Dialog } from "../../components/Dialog";
@@ -14,7 +14,7 @@ import {
 import { LineCanvas, type PlaybackView, type Selection } from "./LineCanvas";
 import {
   designFromMachines, freeSpot, makeBlock, newDesign, paletteLabel,
-  type PaletteItem, type SimLineOut, type SimLineSummary,
+  CANVAS_WIDTH, CANVAS_HEIGHT, type CanvasBounds, type PaletteItem, type SimLineOut, type SimLineSummary,
 } from "./model";
 import { JobsPanel, ResultsPanel, SettingsPanel } from "./Panels";
 
@@ -45,6 +45,9 @@ export function LineSimulatorPage() {
   const [problems, setProblems] = useState<DesignProblem[]>([]);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [canvasSession, setCanvasSession] = useState(0);
+  const viewport = useRef<CanvasBounds>({ x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
+  const trackViewport = useCallback((bounds: CanvasBounds) => { viewport.current = bounds; }, []);
 
   // playback
   const [result, setResult] = useState<SimulationResult | null>(null);
@@ -74,6 +77,7 @@ export function LineSimulatorPage() {
   }
 
   function loadDesign(nextDesign: LineDesign, nextName: string, nextId: string | null) {
+    setCanvasSession((session) => session + 1);
     stopPlayback();
     setDesign(nextDesign);
     setName(nextName);
@@ -130,7 +134,7 @@ export function LineSimulatorPage() {
   });
 
   function addBlock(item: PaletteItem, x?: number, y?: number) {
-    const spot = x === undefined || y === undefined ? freeSpot(design) : { x, y };
+    const spot = x === undefined || y === undefined ? freeSpot(design, viewport.current) : { x, y };
     const block = makeBlock(design, item, spot.x, spot.y);
     changeDesign({ ...design, blocks: [...design.blocks, block] });
     setSelection({ kind: "block", id: block.id });
@@ -300,7 +304,8 @@ export function LineSimulatorPage() {
         </aside>
 
         <div className="ls-canvas-wrap card">
-          <LineCanvas design={design} onChange={changeDesign} selection={selection} playback={playback}
+          <LineCanvas key={canvasSession} design={design} onChange={changeDesign} selection={selection} playback={playback}
+            onViewportChange={trackViewport}
             onSelect={(next) => { setSelection(next); if (next) setTab("settings"); }}
             onDropItem={(item, x, y) => addBlock(item, x, y)} />
         </div>

@@ -23,23 +23,35 @@
 .ls-legend { display: flex; flex-direction: column; gap: 4px; margin: var(--space-3) 0 0; }
 .ls-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 
-.ls-canvas-wrap { padding: 0; overflow: hidden; }
+.ls-canvas-wrap { position: relative; padding: 0 0 64px; overflow: hidden; }
 .ls-canvas { display: block; width: 100%; height: auto; touch-action: none; user-select: none; background: var(--color-surface); }
-.ls-canvas:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.ls-canvas:focus { outline: none; }
+.ls-canvas:focus-visible:not([data-pointer-focus]) { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.ls-canvas[data-moving] { cursor: grabbing; }
+.ls-canvas[data-moving] * { cursor: inherit; }
+.ls-camera-controls { position: absolute; bottom: 12px; right: 12px; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+.ls-camera-controls output { min-width: 42px; text-align: center; color: var(--color-text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ls-camera-divider { height: 20px; width: 1px; margin: 0 4px; background: var(--color-border); }
+.ls-canvas-hint { position: absolute; left: 12px; bottom: 96px; margin: 0; padding: 5px 8px; max-width: calc(100% - 24px); border-radius: var(--radius-small); background: var(--color-surface); color: var(--color-text-muted); font-size: 11px; pointer-events: none; }
+.ls-context-menu { position: fixed; z-index: 100; width: 204px; max-width: calc(100vw - 16px); padding: 5px; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); box-shadow: var(--shadow-card); }
+.ls-context-delete { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; border: 0; border-radius: var(--radius-small); padding: 8px 10px; background: transparent; color: var(--color-danger); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.ls-context-delete:hover, .ls-context-delete:focus-visible { background: var(--color-surface-muted); }
+.ls-context-delete kbd { margin-left: auto; color: var(--color-text-muted); font: inherit; font-size: 11px; }
 .ls-grid-dot { fill: var(--color-border); }
 .ls-arrow { fill: var(--color-text-muted); }
 
 .ls-link { cursor: pointer; }
+.ls-link:focus, .ls-block:focus { outline: none; }
 .ls-link-hit { fill: none; stroke: transparent; stroke-width: 14; }
 .ls-link-line { fill: none; stroke: var(--color-text-muted); stroke-width: 2; }
-.ls-link.is-selected .ls-link-line { stroke: var(--color-accent); stroke-width: 3; }
+.ls-link.is-selected .ls-link-line, .ls-link:focus-visible .ls-link-line { stroke: var(--color-accent); stroke-width: 3; vector-effect: non-scaling-stroke; }
 .ls-link-draft { stroke-dasharray: 6 5; stroke: var(--color-accent); pointer-events: none; }
 
 .ls-block { cursor: grab; }
 .ls-block-body { fill: var(--color-surface); stroke: var(--color-border); stroke-width: 1.5; }
 .ls-source .ls-block-body, .ls-sink .ls-block-body { fill: var(--color-surface-muted); }
-.ls-block.is-selected .ls-block-body { stroke: var(--color-accent); stroke-width: 2.5; }
 .ls-block.is-bottleneck .ls-block-body { stroke: var(--color-danger); stroke-width: 3; }
+.ls-block.is-selected .ls-block-body, .ls-block:focus-visible .ls-block-body { stroke: var(--color-accent); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 .ls-block-tag { font-size: 11px; font-weight: 700; letter-spacing: .06em; fill: var(--color-text-muted); }
 .ls-block-name { font-size: 13px; font-weight: 600; fill: var(--color-text); }
 .ls-block-stripe { fill: var(--color-border); }

@@ -1,7 +1,10 @@
 // The flat 2D canvas: draw blocks and links, drag to move, drag from a port to link, show playback.
-import { useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from "react";
 import { canLink, type LineBlock, type LineDesign, type MachineState } from "./engine";
-import { BLOCK_HEIGHT, BLOCK_WIDTH, CANVAS_HEIGHT, CANVAS_WIDTH, blockAt, clampPosition, newId } from "./model";
+import { BLOCK_HEIGHT, BLOCK_WIDTH, blockAt, snapPosition, newId, removeBlock, type CanvasBounds } from "./model";
+import { Icon } from "../../shell/icons";
+import { LineContextMenu } from "./LineContextMenu";
+import { MAX_LINE_ZOOM, MIN_LINE_ZOOM, useLineCamera } from "./use-line-camera";
 
 export type Selection = { kind: "block" | "link"; id: string } | null;
 
@@ -52,36 +55,50 @@ type Gesture =
   | { kind: "move"; blockId: string; offsetX: number; offsetY: number; moved: boolean }
   | { kind: "link"; fromId: string; x: number; y: number };
 
-export function LineCanvas({ design, onChange, selection, onSelect, playback, onDropItem }: {
+export function LineCanvas({ design, onChange, selection, onSelect, playback, onDropItem, onViewportChange }: {
   design: LineDesign;
   onDropItem: (item: string, x: number, y: number) => void;
   onChange: (design: LineDesign) => void;
   selection: Selection;
   onSelect: (selection: Selection) => void;
   playback: PlaybackView | null;
+  onViewportChange: (bounds: CanvasBounds) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const camera = useLineCamera(svgRef, design.blocks);
   const [gesture, setGesture] = useState<Gesture | null>(null);
+  const [menu, setMenu] = useState<{ target: NonNullable<Selection>; x: number; y: number } | null>(null);
+  const pendingMenu = useRef<typeof menu>(null);
   const blocksById = new Map(design.blocks.map((block) => [block.id, block]));
+  const toCanvas = camera.toWorld;
+  useEffect(() => onViewportChange(camera.bounds), [camera.bounds, onViewportChange]);
+  const closeMenu = useCallback((restoreFocus = false) => {
+    setMenu(null);
+    if (restoreFocus) svgRef.current?.focus({ preventScroll: true });
+  }, []);
 
-  function toCanvas(clientX: number, clientY: number) {
-    const svg = svgRef.current;
-    if (!svg) return { x: 0, y: 0 };
-    const matrix = svg.getScreenCTM?.();
-    if (matrix) {
-      const point = new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse());
-      return { x: point.x, y: point.y };
-    }
-    const box = svg.getBoundingClientRect();
-    return {
-      x: (clientX - box.left) * (CANVAS_WIDTH / (box.width || CANVAS_WIDTH)),
-      y: (clientY - box.top) * (CANVAS_HEIGHT / (box.height || CANVAS_HEIGHT)),
-    };
+  function targetAt(element: EventTarget | null): Selection {
+    if (!(element instanceof Element)) return null;
+    const block = element.closest("[data-block-id]")?.getAttribute("data-block-id");
+    if (block) return { kind: "block", id: block };
+    const link = element.closest("[data-link-id]")?.getAttribute("data-link-id");
+    return link ? { kind: "link", id: link } : null;
+  }
+
+  function deleteItem(target: NonNullable<Selection>) {
+    onChange(target.kind === "block" ? removeBlock(design, target.id) :
+      { ...design, links: design.links.filter((link) => link.id !== target.id) });
+    onSelect(null);
+    setGesture(null);
+    closeMenu(true);
   }
 
   function onBlockPointerDown(event: PointerEvent, block: LineBlock) {
     if (event.button !== 0) return;
     event.stopPropagation();
+    closeMenu();
+    camera.moved.current = false;
+    svgRef.current?.focus({ preventScroll: true });
     svgRef.current?.setPointerCapture?.(event.pointerId);
     const point = toCanvas(event.clientX, event.clientY);
     const onPort = (event.target as Element).hasAttribute("data-port");
@@ -90,18 +107,23 @@ export function LineCanvas({ design, onChange, selection, onSelect, playback, on
     onSelect({ kind: "block", id: block.id });
   }
 
-  function onPointerMove(event: PointerEvent) {
+  function onPointerMove(event: PointerEvent<SVGSVGElement>) {
+    if (camera.handlers.onPointerMove(event)) { pendingMenu.current = null; closeMenu(); return; }
     if (!gesture) return;
     const point = toCanvas(event.clientX, event.clientY);
     if (gesture.kind === "link") { setGesture({ ...gesture, ...point }); return; }
-    const position = clampPosition(point.x - gesture.offsetX, point.y - gesture.offsetY);
+    const position = snapPosition(point.x - gesture.offsetX, point.y - gesture.offsetY);
     const block = blocksById.get(gesture.blockId);
     if (!block || (block.x === position.x && block.y === position.y)) return;
     onChange({ ...design, blocks: design.blocks.map((item) => item.id === block.id ? { ...item, ...position } : item) });
     if (!gesture.moved) setGesture({ ...gesture, moved: true });
   }
 
-  function onPointerUp(event: PointerEvent) {
+  function onPointerUp(event: PointerEvent<SVGSVGElement>) {
+    const candidate = pendingMenu.current;
+    pendingMenu.current = null;
+    camera.handlers.onPointerUp(event);
+    if (candidate && !camera.moved.current) { onSelect(candidate.target); setMenu(candidate); }
     if (gesture?.kind === "link") {
       const point = toCanvas(event.clientX, event.clientY);
       const target = blockAt(design, point.x, point.y);
@@ -120,36 +142,57 @@ export function LineCanvas({ design, onChange, selection, onSelect, playback, on
     onDropItem(item, point.x, point.y);
   }
 
-  function onKeyDown(event: KeyboardEvent) {
+  function onKeyDown(event: KeyboardEvent<SVGSVGElement>) {
+    delete event.currentTarget.dataset.pointerFocus;
+    if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
+      event.preventDefault();
+      const target = targetAt(event.target) ?? selection;
+      if (!target) return;
+      const box = (event.target as Element).getBoundingClientRect();
+      onSelect(target);
+      setMenu({ target, x: box.x + box.width / 2, y: box.y + box.height / 2 });
+      return;
+    }
+    camera.handlers.onKeyDown(event);
     if ((event.key !== "Delete" && event.key !== "Backspace") || !selection) return;
     event.preventDefault();
-    if (selection.kind === "link") onChange({ ...design, links: design.links.filter((link) => link.id !== selection.id) });
-    else onChange({
-      ...design,
-      blocks: design.blocks.filter((block) => block.id !== selection.id),
-      links: design.links.filter((link) => link.from !== selection.id && link.to !== selection.id),
-    });
-    onSelect(null);
+    deleteItem(selection);
   }
 
   const linkingFrom = gesture?.kind === "link" ? blocksById.get(gesture.fromId) : undefined;
 
-  return (
-    <svg ref={svgRef} className="ls-canvas" viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`} role="application"
-      aria-label="Machine line canvas. Drag blocks to move them. Drag from the round port on a block's right side to another block to link them. Press Delete to remove the selected item."
+  const { x, y, width, height } = camera.bounds;
+  return (<>
+    <svg ref={svgRef} className="ls-canvas" viewBox={`${x} ${y} ${width} ${height}`} role="application"
+      data-moving={camera.moving || undefined} data-zoom={camera.view.zoom}
+      aria-label="Machine line canvas. Drag blocks to move; drag from a round output port to connect. Right-click an element for actions, or right-drag to pan. Scroll to zoom. Arrows pan, plus and minus zoom, F fits the line, Home resets. Delete removes the selected element."
       tabIndex={0} data-testid="line-canvas"
-      onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => setGesture(null)}
-      onPointerDown={() => onSelect(null)} onKeyDown={onKeyDown}
+      onPointerDownCapture={(event) => { event.currentTarget.dataset.pointerFocus = "true"; }}
+      onBlur={(event) => { if (event.target === event.currentTarget) delete event.currentTarget.dataset.pointerFocus; }}
+      onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+      onPointerCancel={(event) => { pendingMenu.current = null; camera.handlers.onPointerCancel(event); setGesture(null); }}
+      onLostPointerCapture={(event) => { pendingMenu.current = null; camera.handlers.onLostPointerCapture(event); setGesture(null); }}
+      onPointerDown={(event) => { pendingMenu.current = null; closeMenu(); camera.handlers.onPointerDown(event); setGesture(null); if (event.button === 0) onSelect(null); }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        const target = targetAt(event.target);
+        if (camera.moved.current || !target) { closeMenu(); return; }
+        const candidate = { target, x: event.clientX, y: event.clientY };
+        // Some browsers emit contextmenu on press; wait for release to distinguish a pan.
+        if (camera.isPanning()) { pendingMenu.current = candidate; return; }
+        onSelect(target);
+        setMenu(candidate);
+      }} onKeyDown={onKeyDown}
       onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
       <defs>
         <pattern id="ls-grid" width="20" height="20" patternUnits="userSpaceOnUse">
           <circle cx="1" cy="1" r="1" className="ls-grid-dot" />
         </pattern>
-        <marker id="ls-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <marker id="ls-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto-start-reverse">
           <path d="M0 0 10 5 0 10z" className="ls-arrow" />
         </marker>
       </defs>
-      <rect width={CANVAS_WIDTH} height={CANVAS_HEIGHT} fill="url(#ls-grid)" />
+      <rect x={x - width} y={y - height} width={width * 3} height={height * 3} fill="url(#ls-grid)" />
 
       {design.links.map((link) => {
         const from = blocksById.get(link.from), to = blocksById.get(link.to);
@@ -158,7 +201,10 @@ export function LineCanvas({ design, onChange, selection, onSelect, playback, on
         const path = linkPath(from, to);
         return (
           <g key={link.id} className={`ls-link${selected ? " is-selected" : ""}`} data-testid={`line-link-${link.from}-${link.to}`}
-            onPointerDown={(event) => { event.stopPropagation(); onSelect({ kind: "link", id: link.id }); }}>
+            data-link-id={link.id} role="button" tabIndex={0} aria-label={`Connection from ${from.name} to ${to.name}`}
+            onFocus={() => onSelect({ kind: "link", id: link.id })}
+            onPointerDown={(event) => { if (event.button !== 0) return; event.stopPropagation(); closeMenu(); camera.moved.current = false;
+              svgRef.current?.focus({ preventScroll: true }); onSelect({ kind: "link", id: link.id }); }}>
             <path d={path} className="ls-link-hit" />
             <path d={path} className="ls-link-line" markerEnd="url(#ls-arrow)" />
           </g>
@@ -178,6 +224,8 @@ export function LineCanvas({ design, onChange, selection, onSelect, playback, on
           <g key={block.id} transform={`translate(${block.x - BLOCK_WIDTH / 2} ${block.y - BLOCK_HEIGHT / 2})`}
             className={`ls-block ls-${block.kind}${selected ? " is-selected" : ""}${isBottleneck ? " is-bottleneck" : ""}`}
             data-testid={`line-block-${block.id}`} data-state={state ?? ""}
+            data-block-id={block.id} role="button" tabIndex={0} aria-label={block.name}
+            onFocus={() => onSelect({ kind: "block", id: block.id })}
             onPointerDown={(event) => onBlockPointerDown(event, block)}>
             <title>{block.name}</title>
             <rect className="ls-block-body" width={BLOCK_WIDTH} height={BLOCK_HEIGHT} rx="10" />
@@ -206,5 +254,15 @@ export function LineCanvas({ design, onChange, selection, onSelect, playback, on
         return <circle key={dot.id} cx={point.x} cy={point.y} r="5" className={`ls-dot ls-job-${dot.jobIndex % 6}`} />;
       })}
     </svg>
-  );
+    <div className="ls-camera-controls" role="group" aria-label="Canvas controls">
+      <button type="button" className="icon-button" aria-label="Zoom in" data-tooltip="Zoom in" disabled={camera.view.zoom >= MAX_LINE_ZOOM} onClick={() => { closeMenu(); camera.zoom(1.22); }}><Icon name="plus" /></button>
+      <output aria-label="Canvas zoom">{Math.round(camera.view.zoom * 100)}%</output>
+      <button type="button" className="icon-button" aria-label="Zoom out" data-tooltip="Zoom out" disabled={camera.view.zoom <= MIN_LINE_ZOOM} onClick={() => { closeMenu(); camera.zoom(1 / 1.22); }}><Icon name="minus" /></button>
+      <span className="ls-camera-divider" />
+      <button type="button" className="icon-button" aria-label="Fit line" data-tooltip="Fit line (F)" onClick={() => { closeMenu(); camera.fit(); }}><Icon name="focus" /></button>
+      <button type="button" className="icon-button" aria-label="Reset camera" data-tooltip="Reset camera (Home)" onClick={() => { closeMenu(); camera.reset(); }}><Icon name="home" /></button>
+    </div>
+    <p className="ls-canvas-hint">Right-drag to pan · Scroll to zoom · Right-click an element for actions</p>
+    {menu && <LineContextMenu x={menu.x} y={menu.y} kind={menu.target.kind} onClose={closeMenu} onDelete={() => deleteItem(menu.target)} />}
+  </>);
 }

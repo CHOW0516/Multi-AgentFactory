@@ -8,6 +8,7 @@ export const CANVAS_WIDTH = 960;
 export const CANVAS_HEIGHT = 600;
 export const BLOCK_WIDTH = 112;
 export const BLOCK_HEIGHT = 64;
+export interface CanvasBounds { x: number; y: number; width: number; height: number }
 
 export interface SimLineSummary { id: string; name: string; updated_at: string }
 export interface SimLineOut extends SimLineSummary { design: LineDesign }
@@ -35,11 +36,11 @@ function nextName(design: LineDesign, base: string): string {
   return `${base} ${number}`;
 }
 
-export function clampPosition(x: number, y: number): { x: number; y: number } {
+export function snapPosition(x: number, y: number): { x: number; y: number } {
   const snap = (value: number) => Math.round(value / 10) * 10;
   return {
-    x: Math.min(CANVAS_WIDTH - BLOCK_WIDTH / 2, Math.max(BLOCK_WIDTH / 2, snap(x))),
-    y: Math.min(CANVAS_HEIGHT - BLOCK_HEIGHT / 2, Math.max(BLOCK_HEIGHT / 2, snap(y))),
+    x: snap(x),
+    y: snap(y),
   };
 }
 
@@ -51,7 +52,7 @@ export function makeBlock(design: LineDesign, item: PaletteItem, x: number, y: n
     kind,
     name: nextName(design, paletteLabel(item)),
     machineType: info?.type ?? "",
-    ...clampPosition(x, y),
+    ...snapPosition(x, y),
     cycleSeconds: info?.cycleSeconds ?? 0,
     setupMinutes: info?.setupMinutes ?? 0,
     scrapPercent: 0,
@@ -65,13 +66,14 @@ function overlapsAny(design: LineDesign, x: number, y: number): boolean {
 }
 
 /** A free spot for a block added by clicking (not dragging): left to right, top to bottom. */
-export function freeSpot(design: LineDesign): { x: number; y: number } {
-  for (let y = 100; y < CANVAS_HEIGHT; y += 100) {
-    for (let x = 80; x < CANVAS_WIDTH; x += 150) {
-      if (!overlapsAny(design, x, y)) return { x, y };
+export function freeSpot(design: LineDesign, area: CanvasBounds = { x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT }): { x: number; y: number } {
+  const columns = Math.max(1, Math.floor(area.width / 150));
+  for (let row = 0; ; row++) {
+    for (let column = 0; column < columns; column++) {
+      const spot = snapPosition(area.x + 80 + column * 150, area.y + 100 + row * 100);
+      if (!overlapsAny(design, spot.x, spot.y)) return spot;
     }
   }
-  return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
 }
 
 export function makeJob(design: LineDesign): LineJob {
