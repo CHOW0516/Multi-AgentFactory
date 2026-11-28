@@ -1,25 +1,25 @@
 {
-  "node_count": 2419,
+  "node_count": 2908,
   "unverified_node_count": 0,
-  "raw_edge_count": 8233,
+  "raw_edge_count": 9727,
   "non_object_edges": 0,
   "missing_endpoint_edges": 0,
-  "dangling_endpoint_edges": 544,
-  "self_loop_edges": 1,
-  "valid_candidate_edges": 7689,
-  "exact_duplicate_edges": 79,
-  "directed_unique_endpoint_pairs": 7335,
-  "directed_same_endpoint_collapsed_edges": 354,
-  "undirected_unique_endpoint_pairs": 7334,
-  "undirected_same_endpoint_collapsed_edges": 355,
-  "same_endpoint_group_count": 296,
-  "relation_variant_groups": 232,
+  "dangling_endpoint_edges": 647,
+  "self_loop_edges": 4,
+  "valid_candidate_edges": 9080,
+  "exact_duplicate_edges": 83,
+  "directed_unique_endpoint_pairs": 8671,
+  "directed_same_endpoint_collapsed_edges": 409,
+  "undirected_unique_endpoint_pairs": 8669,
+  "undirected_same_endpoint_collapsed_edges": 411,
+  "same_endpoint_group_count": 346,
+  "relation_variant_groups": 279,
   "source_file_variant_groups": 0,
-  "source_location_variant_groups": 9,
-  "context_variant_groups": 13,
+  "source_location_variant_groups": 11,
+  "context_variant_groups": 14,
   "post_build_graph_type": "Graph",
-  "post_build_node_count": 2419,
-  "post_build_edge_count": 7337,
+  "post_build_node_count": 2908,
+  "post_build_edge_count": 8670,
   "post_build_error": "",
   "producer_suppression": {
     "path": "C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\graphify\\extract.py",
@@ -138,9 +138,9 @@
         "backend/app/agents/material/service.py"
       ],
       "source_locations": [
-        "L203",
-        "L205",
-        "L256"
+        "L207",
+        "L209",
+        "L260"
       ],
       "contexts": [
         "",
@@ -161,8 +161,8 @@
         "backend/app/agents/material/service.py"
       ],
       "source_locations": [
-        "L292",
-        "L315"
+        "L296",
+        "L319"
       ],
       "contexts": [
         "",
@@ -183,8 +183,8 @@
         "backend/app/agents/material/service.py"
       ],
       "source_locations": [
-        "L384",
-        "L418"
+        "L388",
+        "L422"
       ],
       "contexts": [
         "",
@@ -205,9 +205,9 @@
         "backend/app/agents/order/customer.py"
       ],
       "source_locations": [
-        "L19",
-        "L21",
-        "L35"
+        "L26",
+        "L28",
+        "L42"
       ],
       "contexts": [
         "",

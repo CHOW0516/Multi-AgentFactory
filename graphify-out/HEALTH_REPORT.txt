@@ -2,25 +2,25 @@
 input: <in-memory>
 input_stage: provided JSON (normal graph.json is post-build)
 effective_directed: <direct-call>
-nodes: 2419
+nodes: 2908
 unverified_code_nodes: 0
-raw_edges: 8233
-valid_candidate_edges: 7689
+raw_edges: 9727
+valid_candidate_edges: 9080
 missing_endpoint_edges: 0
-dangling_endpoint_edges: 544
-self_loop_edges: 1
-exact_duplicate_edges: 79
-directed_unique_endpoint_pairs: 7335
-directed_same_endpoint_collapsed_edges: 354
-undirected_unique_endpoint_pairs: 7334
-undirected_same_endpoint_collapsed_edges: 355
-same_endpoint_group_count: 296
-relation_variant_groups: 232
+dangling_endpoint_edges: 647
+self_loop_edges: 4
+exact_duplicate_edges: 83
+directed_unique_endpoint_pairs: 8671
+directed_same_endpoint_collapsed_edges: 409
+undirected_unique_endpoint_pairs: 8669
+undirected_same_endpoint_collapsed_edges: 411
+same_endpoint_group_count: 346
+relation_variant_groups: 279
 source_file_variant_groups: 0
-source_location_variant_groups: 9
-context_variant_groups: 13
+source_location_variant_groups: 11
+context_variant_groups: 14
 post_build_graph_type: Graph
-post_build_edges: 7337
+post_build_edges: 8670
 producer_suppression_sites: 12
 producer_suppression_examples:
   - L1204 seen_ids arity=unknown
@@ -33,8 +33,9 @@ producer_suppression_examples:
   - L4436 seen_ids arity=unknown
 examples:
   - backend_app_messaging_core_publish_result -> backend_app_schemas_envelope_envelope edges=5 relations=['calls', 'references', 'uses'] locations=['L174', 'L175', 'L183'] contexts=['', 'call', 'parameter_type', 'return_type']
-  - backend_app_agents_material_service_check_and_hold -> backend_app_schemas_contracts_checkandholdresult edges=4 relations=['calls', 'references', 'uses'] locations=['L203', 'L205', 'L256'] contexts=['', 'call', 'return_type']
-  - backend_app_agents_material_service_recheck_holds -> backend_app_schemas_contracts_recheckresult edges=4 relations=['calls', 'references', 'uses'] locations=['L292', 'L315'] contexts=['', 'call', 'return_type']
-  - backend_app_agents_material_service_create_purchase_requests -> backend_app_schemas_contracts_createpurchaserequestsresult edges=4 relations=['calls', 'references', 'uses'] locations=['L384', 'L418'] contexts=['', 'call', 'return_type']
-  - backend_app_agents_order_customer_draft_customer_reply -> backend_app_schemas_contracts_draftcustomerreplyresult edges=4 relations=['calls', 'references', 'uses'] locations=['L19', 'L21', 'L35'] contexts=['', 'call', 'return_type']
+  - backend_app_agents_material_service_check_and_hold -> backend_app_schemas_contracts_checkandholdresult edges=4 relations=['calls', 'references', 'uses'] locations=['L207', 'L209', 'L260'] contexts=['', 'call', 'return_type']
+  - backend_app_agents_material_service_recheck_holds -> backend_app_schemas_contracts_recheckresult edges=4 relations=['calls', 'references', 'uses'] locations=['L296', 'L319'] contexts=['', 'call', 'return_type']
+  - backend_app_agents_material_service_create_purchase_requests -> backend_app_schemas_contracts_createpurchaserequestsresult edges=4 relations=['calls', 'references', 'uses'] locations=['L388', 'L422'] contexts=['', 'call', 'return_type']
+  - backend_app_agents_order_customer_draft_customer_reply -> backend_app_schemas_contracts_draftcustomerreplyresult edges=4 relations=['calls', 'references', 'uses'] locations=['L26', 'L28', 'L42'] contexts=['', 'call', 'return_type']
 note: normal graph.json is post-build; raw producer loss must be measured earlier.
+Graph health warning: 647 dangling-endpoint edges, 4 self-loop edges and 411 relationships collapsed by the undirected simple graph. See HEALTH_REPORT.txt. No semantic edges have dangling endpoints.
