@@ -48,7 +48,7 @@ registerMock("GET", "/dashboard/charts/:chartName", ({ params }) => {
 });
 
 const ATTENTION: AttentionItem[] = [
-  { severity: "high", kind: "machine_down", title: "LATHE-02 is down", detail: "Jobs on this machine are being replanned. Check the replan approvals.", link: "/factory-floor", action: "Open floor" },
+  { severity: "high", kind: "machine_down", title: "LATHE-02 is down", detail: "Jobs on this machine are being replanned. Check the replan approvals.", link: "/", action: "Open floor" },
   { severity: "high", kind: "order_at_risk", title: "SO-2026-0412 may miss its date", detail: "Planned to finish on 04 Dec, but promised on 03 Dec.", link: "/orders", action: "Open order" },
   { severity: "medium", kind: "approval_waiting", title: "Order approval for SO-2026-0415 is waiting", detail: "Waiting 5 h.", link: "/approvals", action: "Decide" },
   { severity: "medium", kind: "material_short", title: "SO-2026-0417 is short of material", detail: "Check the purchase requests for this order.", link: "/materials", action: "Open order" },

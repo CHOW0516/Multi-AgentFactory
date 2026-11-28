@@ -53,7 +53,7 @@ async def attention_items(session, now=None) -> list[dict]:
                 "machine_down",
                 f"{machine.code} is {machine.status}",
                 "Jobs on this machine are being replanned. Check the replan approvals.",
-                "/factory-floor",
+                "/",
                 "Open floor",
             )
         )
