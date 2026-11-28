@@ -119,7 +119,6 @@ export function createMapArt(camera: Projection = mapCamera, detail: GeometryDet
       depthPoint: [x + station.width / 2, y + station.depth / 2, 30] as Point3 }];
   })) as Record<MapAgent, (typeof stationInfo)[MapAgent] & { transform: string; plate: string; depthPoint: Point3 }>;
 
-  const loop: Plane[] = [[220, 159], [752, 159], [752, 478], [220, 478], [220, 159]];
   const ringZ = 4;
   const routeHeight = 10;
   const routes: Record<Station, Plane[]> = {
@@ -132,28 +131,23 @@ export function createMapArt(camera: Projection = mapCamera, detail: GeometryDet
     simulator: [[408, 364], [330, 364], [330, 478], [220, 478], [175, 478]],
   };
 
-  function segment(from: Plane, to: Plane, rollers: boolean) {
+  function segment(from: Plane, to: Plane) {
     const span = Math.hypot(to[0] - from[0], to[1] - from[1]);
     const unit: Plane = [(to[0] - from[0]) / span, (to[1] - from[1]) / span];
     const edge: Plane = [-unit[1], unit[0]];
     const at = (distance: number, side = 0): Plane => [from[0] + unit[0] * distance + edge[0] * side, from[1] + unit[1] * distance + edge[1] * side];
     const rails = [-7, 7].map((side) => world.strip(at(0, side), at(span, side), 8, 2, 1.8, "steel")).join("");
-    const roll = (distance: number) => world.strip(at(distance, -6), at(distance, 6), 7, 2.5, 1.1, "steel");
     const supportCount = detail === "motion" ? 1 : Math.max(1, Math.ceil(span / 66));
     const supports = Array.from({ length: supportCount }, (_, index) => {
       const distance = (index + .5) * span / supportCount;
       const [x, y] = at(distance);
       return world.block(x - 3, y - 3, 0, 6, 6, ringZ, "steel", "lo", 1);
     }).join("");
-    return supports + world.strip(from, to, ringZ, 16, 3, "track") + rails +
-      (rollers && detail === "full" ? Array.from({ length: Math.floor((span - 8) / 14) }, (_, index) => roll(9 + index * 14)).join("") : "");
+    return supports + world.strip(from, to, ringZ, 16, 3, "track") + rails;
   }
 
-  const ringArt = loop.slice(1).map((point, index) => segment(loop[index], point, true)).join("") +
-    loop.slice(1).map(([x, y]) => world.block(x - 8, y - 8, 4, 16, 16, 4, "steel", "lo", 2)).join("");
-
   function spurArt(path: Plane[]) {
-    return path.slice(1).map((point, index) => segment(path[index], point, false)).join("") +
+    return path.slice(1).map((point, index) => segment(path[index], point)).join("") +
       path.map(([x, y], index) => world.block(x - 7, y - 7, 4, 14, 14, index === 0 || index === path.length - 1 ? 6 : 4, "steel", "lo", 2)).join("");
   }
 
@@ -183,7 +177,7 @@ export function createMapArt(camera: Projection = mapCamera, detail: GeometryDet
     }).join("");
   }
 
-  return { stationArt, ringArt, railArt, roomArt, ducts };
+  return { stationArt, railArt, roomArt, ducts };
 }
 
-export const { stationArt, ringArt, railArt, roomArt, ducts } = createMapArt();
+export const { stationArt, railArt, roomArt, ducts } = createMapArt();

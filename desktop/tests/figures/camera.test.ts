@@ -79,7 +79,8 @@ describe("camera movement geometry", () => {
     const full = createMapArt(camera);
     const motion = createMapArt(camera, "motion");
     expect(Object.keys(motion.stationArt)).toEqual(Object.keys(full.stationArt));
-    expect(motion.ringArt.length).toBeLessThan(full.ringArt.length / 2);
+    const railSize = (art: ReturnType<typeof createMapArt>) => Object.values(art.railArt).reduce((size, rail) => size + rail.art.length, 0);
+    expect(railSize(motion)).toBeLessThan(railSize(full) / 2);
     for (const name of Object.keys(full.railArt) as (keyof typeof full.railArt)[]) {
       expect(motion.railArt[name].sample(.5)).toEqual(full.railArt[name].sample(.5));
     }

@@ -8,6 +8,10 @@ const page=await browser.newPage({viewport:{width:1440,height:970}});page.on('pa
 const shot=name=>page.screenshot({path:resolve(out,name+'.png'),fullPage:true});
 async function inspect(floor){
  await page.getByRole('link',{name:floor?'Factory floor':'Agent map',exact:true}).click();
+ const canvas=page.locator('.floor-model'),canvasBounds=await canvas.boundingBox();
+ await canvas.click({position:{x:canvasBounds.width-18,y:canvasBounds.height*.4}});
+ await expect(canvas).toHaveCSS('outline-style','none');
+ await canvas.press('ArrowRight');await expect(canvas).toHaveCSS('outline-style','solid');
  await page.getByRole('button',{name:floor?/^CNC Lathe 1,/: 'Planning station'}).focus();await page.keyboard.press('Enter');
  const drawer=page.getByRole('dialog',{name:floor?'CNC Lathe 1':'Planning',exact:true});await expect(drawer).toBeVisible();
  await expect(page.locator('.floor-workspace')).toHaveAttribute('data-inspecting','true');await expect(page.locator('.floor-model')).toHaveAttribute('data-zoom','1.45');await page.waitForTimeout(260);

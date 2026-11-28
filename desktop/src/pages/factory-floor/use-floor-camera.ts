@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject } from "react";
 import { floorViewport, initialView, orbit, zoomAt, type FloorView } from "./floor-camera";
 
 type Pair = [number, number];
@@ -197,7 +197,11 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
     reset: () => animate(initialView),
     turn: (amount: number) => animate(orbit(destination.current ?? latest.current, amount)),
     zoom: (amount: number) => animate(zoomAt(destination.current ?? latest.current, amount)),
-    handlers: { onPointerDown, onPointerMove, onPointerUp: onPointerEnd, onPointerCancel: onPointerEnd,
+    handlers: {
+      onPointerDownCapture: (event: PointerEvent<SVGSVGElement>) => { event.currentTarget.dataset.pointerFocus = "true"; },
+      onKeyDownCapture: (event: KeyboardEvent<SVGSVGElement>) => { delete event.currentTarget.dataset.pointerFocus; },
+      onBlur: (event: FocusEvent<SVGSVGElement>) => { if (event.target === event.currentTarget) delete event.currentTarget.dataset.pointerFocus; },
+      onPointerDown, onPointerMove, onPointerUp: onPointerEnd, onPointerCancel: onPointerEnd,
       onContextMenu: (event: MouseEvent<SVGSVGElement>) => event.preventDefault(),
       onLostPointerCapture: (event: PointerEvent<SVGSVGElement>) => {
         if (event.target === event.currentTarget) onPointerEnd(event);

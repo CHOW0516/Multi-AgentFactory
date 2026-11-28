@@ -60,7 +60,8 @@
   cursor: grab;
 }
 .floor-viewport[data-moving] :is(.floor-model, .p5-machine) { cursor: grabbing; }
-.floor-model:focus-visible { outline-offset: -3px; }
+.floor-model:focus { outline: none; }
+.floor-model:focus-visible:not([data-pointer-focus]) { outline: 2px solid var(--color-focus); outline-offset: -3px; }
 .floor-workspace .p5-ink.p5-blue { --p5-material: var(--floor-blue); }
 .floor-workspace .p5-ink.p5-road { --p5-material: var(--floor-road); }
 .floor-workspace .p5-blue > .iso-top { fill: color-mix(in srgb, var(--floor-blue) 85%, #badaff); }

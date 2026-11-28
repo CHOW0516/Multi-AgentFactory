@@ -48,8 +48,8 @@ function clearParcel(node: SVGPathElement) {
 }
 
 const Ground = memo(function Ground({ names, art }: { names: Station[]; art: MapArt }) {
-  const { roomArt, ducts, ringArt, railArt } = art;
-  return <g aria-hidden="true" dangerouslySetInnerHTML={{ __html: roomArt + ducts(names) + ringArt +
+  const { roomArt, ducts, railArt } = art;
+  return <g aria-hidden="true" dangerouslySetInnerHTML={{ __html: roomArt + ducts(names) +
     names.map((name) => railArt[name].art).join("") }} />;
 });
 
