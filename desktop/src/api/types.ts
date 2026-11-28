@@ -29,7 +29,7 @@ export interface PartOut { id: Uuid; part_number: string; revision: string; desc
 export interface BomLineOut { id: Uuid; material_id: Uuid; quantity_per_part: DecimalString; scrap_rate: DecimalString }
 export interface RoutingStepOut { id: Uuid; step_number: number; machine_type: string; setup_minutes: number; cycle_seconds_per_part: DecimalString }
 export interface SupplierOut { id: Uuid; name: string; email: string | null }
-export interface MachineOut { id: Uuid; code: string; name: string; machine_type: string; status: MachineStatus; floor_x: number; floor_y: number }
+export interface MachineOut { id: Uuid; code: string; name: string; machine_type: string; status: MachineStatus; floor_x: number; floor_y: number; running_kw?: DecimalString | null; idle_kw?: DecimalString | null }
 export interface ShiftOut { id: Uuid; name: string; weekday: number; start_time: string; end_time: string }
 export interface HolidayOut { id: Uuid; holiday_date: IsoDate; name: string }
 export interface SettingsOut { app_mode: "demo" | "production"; currency: string; timezone: string; values: Record<string, number> }
@@ -42,9 +42,9 @@ export interface OrderDetail extends OrderSummary { po_revision: string | null; 
 export interface ExtractedFieldOut { id: Uuid; field_name: string; value: string | null; confidence: DecimalString; source_page: number | null; source_text: string | null; needs_check: boolean; check_reason: string | null; corrected_value: string | null; corrected_by: Uuid | null }
 export interface FieldCorrection { field_id: Uuid; corrected_value: string }
 export interface ImpactedOrder { order_id: Uuid; order_number: string; old_finish: IsoDate | null; new_finish: IsoDate | null; still_meets_due_date: boolean }
-export type PlanOptionType = "as_requested" | "delay" | "split" | "overtime" | "move_other_order";
+export type PlanOptionType = "as_requested" | "delay" | "split" | "overtime" | "move_other_order" | "cheaper_energy";
 export interface DeliveryConfidence { chance_on_time: number | null; likely_date: IsoDate; safe_date: IsoDate; runs: number; low_history?: boolean }
-export interface PlanOptionOut { id: Uuid; option_type: PlanOptionType; finish_date: IsoDate; split_quantity_first: DecimalString | null; split_finish_date_first: IsoDate | null; overtime_hours: DecimalString; extra_cost: DecimalString; margin: DecimalString | null; machine_load: Record<string, number> | null; impacted_orders: ImpactedOrder[]; explanation: string | null; is_recommended: boolean; status: string; confidence?: DeliveryConfidence | null }
+export interface PlanOptionOut { id: Uuid; option_type: PlanOptionType; finish_date: IsoDate; split_quantity_first: DecimalString | null; split_finish_date_first: IsoDate | null; overtime_hours: DecimalString; extra_cost: DecimalString; energy_kwh?: DecimalString | null; energy_cost?: DecimalString | null; margin: DecimalString | null; machine_load: Record<string, number> | null; impacted_orders: ImpactedOrder[]; explanation: string | null; is_recommended: boolean; status: string; confidence?: DeliveryConfidence | null }
 export interface MaterialNeed { material_id: Uuid; material_code: string; material_name: string; unit: string; needed: DecimalString; available: DecimalString; held: DecimalString; short: DecimalString; arrives: IsoDate | null; last_counted_at: IsoDateTime | null }
 export interface MaterialStatusOut { material_ready_date: IsoDate | null; hold_expires_at: IsoDateTime | null; needs: MaterialNeed[]; data_warnings: string[] }
 export interface CustomerMessageOut { id: Uuid; order_id: Uuid; plan_option_id: Uuid | null; subject: string; draft_text: string; status: "draft" | "sent_by_sales"; sent_at: IsoDateTime | null }

@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import write_audit
-from app.core.config import EDITABLE_SETTING_KEYS, settings
+from app.core.config import EDITABLE_SETTING_KEYS, SETTING_LIMITS, settings
 from app.core.db import get_session
 from app.core.security import current_user, require_roles
 from app.models import AppSetting, User
@@ -46,6 +46,9 @@ async def update_settings(
     for key, value in body.values.items():
         if value < 0:
             raise HTTPException(422, f"{key} cannot be negative")
+        low, high = SETTING_LIMITS.get(key, (0, None))
+        if value < low or (high is not None and value > high):
+            raise HTTPException(422, f"{key} must be between {low} and {high}")
         row = await session.scalar(select(AppSetting).where(AppSetting.key == key))
         if row is None:
             session.add(AppSetting(key=key, value=str(value)))

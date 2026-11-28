@@ -24,6 +24,9 @@ class Machine(TableBase):
     floor_y: Mapped[int] = mapped_column(Integer, default=0)
     original_floor_x: Mapped[int | None] = mapped_column(Integer)
     original_floor_y: Mapped[int | None] = mapped_column(Integer)
+    # Power use in kW. Empty = no energy tracking for this machine.
+    running_kw: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
+    idle_kw: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
 
 
 class FloorLayout(TableBase):

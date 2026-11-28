@@ -226,6 +226,12 @@ def explanation_parts(
             f"Overtime is {candidate.overtime_seconds / HOUR:.2f} hours, costing "
             f"{candidate.extra_cost:.2f} {settings.currency}."
         )
+    if candidate.energy_kwh is not None and candidate.energy_cost is not None:
+        detail.append(
+            f"Electricity is about {candidate.energy_kwh:.0f} kWh, costing {candidate.energy_cost:.2f} {settings.currency}."
+        )
+    if candidate.energy_saving:
+        detail.append(f"That is {candidate.energy_saving:.2f} {settings.currency} less than the normal plan.")
     if candidate.impacted:
         detail.append(f"This option moves {len(candidate.impacted)} other order(s).")
     if missing_costs:
@@ -244,6 +250,7 @@ OPTION_SENTENCES = {
     "split": "This plan ships part of the order early and the rest later.",
     "overtime": "This plan meets the date by adding overtime.",
     "move_other_order": "This plan meets the date by moving other orders later.",
+    "cheaper_energy": "This plan still meets the date but keeps heavy machines out of peak tariff hours.",
 }
 
 
@@ -315,7 +322,7 @@ async def plan_order(
     ids, recommended_id = [], None
     await clear_proposals(session, order_id)
     for candidate in candidates:
-        margin = (revenue - material_cost - candidate.extra_cost).quantize(Decimal("0.01"))
+        margin = (revenue - material_cost - candidate.total_cost).quantize(Decimal("0.01"))
         option = PlanOption(
             order_id=order_id,
             option_type=candidate.kind,
@@ -324,6 +331,8 @@ async def plan_order(
             split_finish_date_first=candidate.first_finish,
             overtime_hours=(candidate.overtime_seconds / HOUR).quantize(Decimal("0.01")),
             extra_cost=candidate.extra_cost,
+            energy_kwh=candidate.energy_kwh,
+            energy_cost=candidate.energy_cost,
             margin=margin,
             machine_load=candidate.load,
             impacted_orders=candidate.impacted,

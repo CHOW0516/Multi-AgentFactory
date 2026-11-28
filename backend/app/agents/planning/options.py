@@ -9,6 +9,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from app.agents.planning.calendar import DAY, Window, calendar, utc
+from app.agents.planning.energy import Tariff, energy_use, heavy_peak_blocks, placements_in_peak
 from app.agents.planning.solver import Job, Placement, Solution, solve_schedule
 from app.models import Machine, Order, ScheduleSlot, Shift
 
@@ -39,6 +40,10 @@ class Scenario:
         return (end + timedelta(hours=self.config["qc_buffer_hours"])).astimezone(
             self.zone
         ).date() + timedelta(days=self.config["shipping_buffer_days"])
+
+    @property
+    def tariff(self) -> Tariff:
+        return Tariff.from_config(self.config, self.zone, self.holidays)
 
     def due_cutoff(self) -> datetime | None:
         if self.due_date is None:
@@ -110,6 +115,13 @@ class Candidate:
     impacted: list[dict]
     optimal: bool
     recommended: bool = False
+    energy_kwh: Decimal | None = None
+    energy_cost: Decimal | None = None
+    energy_saving: Decimal | None = None  # cheaper_energy only: saved compared with the normal plan
+
+    @property
+    def total_cost(self) -> Decimal:
+        return self.extra_cost + (self.energy_cost or 0)
 
 
 def slot_snapshot(slot: ScheduleSlot) -> dict[str, str]:
@@ -193,6 +205,11 @@ def make_candidate(
         for machine in scenario.machines
         if totals[machine.id]
     }
+    energy = energy_use(
+        scenario.tariff,
+        {machine.id: machine for machine in scenario.machines},
+        [(slot.machine_id, slot.start, slot.end) for slot in target_slots],
+    )
     return Candidate(
         kind,
         placements,
@@ -205,6 +222,8 @@ def make_candidate(
         load,
         impacted,
         optimal,
+        energy_kwh=energy.kwh if energy else None,
+        energy_cost=energy.cost if energy else None,
     )
 
 
@@ -245,12 +264,20 @@ def propose(scenario: Scenario, *, what_if: bool = False) -> tuple[list[Candidat
     due = scenario.due_cutoff()
     options, reasons = [], {}
     move_sets = [] if what_if else move_candidates(scenario)
+    tariff = scenario.tariff
+    energy_blocks = heavy_peak_blocks(tariff, scenario.machines, scenario.now, horizon)
+    try_energy = not what_if and due is not None and tariff.peak_saves_money and bool(energy_blocks)
     end_at = monotonic() + time_limit
-    runs = 1 if what_if else 3 + bool(move_sets)
+    runs = 1 if what_if else 3 + bool(move_sets) + try_energy
     budget = time_limit / runs
 
-    def attempt(kind: str, *, cutoff=None, split=False, overtime=False, moved=None, limit=budget):
+    def attempt(
+        kind: str, *, cutoff=None, split=False, overtime=False, moved=None, limit=budget, peak_blocks=None
+    ):
         moved = moved or []
+        blocked = scenario.blocked({slot.id for slot in moved})
+        for machine_id, windows in (peak_blocks or {}).items():
+            blocked[machine_id] = blocked.get(machine_id, []) + windows
         available_time = min(end_at - monotonic(), limit)
         if available_time <= 0:
             reasons[kind] = "the solver reached its time limit"
@@ -261,7 +288,7 @@ def propose(scenario: Scenario, *, what_if: bool = False) -> tuple[list[Candidat
             machines=scenario.machines,
             regular=regular,
             extra=extra,
-            blocked=scenario.blocked({slot.id for slot in moved}),
+            blocked=blocked,
             jobs=scenario.jobs,
             ready=scenario.ready,
             due=cutoff,
@@ -321,10 +348,33 @@ def propose(scenario: Scenario, *, what_if: bool = False) -> tuple[list[Candidat
             limit = (move_end - monotonic()) / (len(move_sets) - index)
             if attempt("move_other_order", cutoff=due, moved=moved, limit=limit):
                 break
+    if not try_energy:
+        if tariff.enabled:
+            reasons["cheaper_energy"] = (
+                "it needs a due date, a peak rate above the off-peak rate, and a heavy machine"
+            )
+    elif not on_time:
+        reasons["cheaper_energy"] = "the normal plan does not meet the due date, so there is no time to spare"
+    elif not placements_in_peak(tariff, scenario.machines, delay.placements):
+        reasons["cheaper_energy"] = "the normal plan already keeps heavy machines out of peak hours"
+    else:
+        cheaper = attempt("cheaper_energy", cutoff=due, peak_blocks=energy_blocks)
+        normal_cost = delay.energy_cost or Decimal(0)
+        if cheaper is not None and (
+            cheaper.finish_date > scenario.due_date
+            or cheaper.energy_cost is None
+            or cheaper.total_cost >= delay.total_cost
+        ):
+            options.remove(cheaper)
+            reasons["cheaper_energy"] = "keeping heavy machines out of peak hours does not save money here"
+        elif cheaper is not None:
+            cheaper.energy_saving = normal_cost - cheaper.energy_cost
+        elif reasons.get("cheaper_energy") == "no feasible schedule was found in the planning window":
+            reasons["cheaper_energy"] = "there is not enough off-peak shift time before the due date"
     meets = [option for option in options if scenario.due_date and option.finish_date <= scenario.due_date]
     if meets:
         winner = min(
-            meets, key=lambda option: (option.extra_cost, option.finish, option.kind != "as_requested")
+            meets, key=lambda option: (option.total_cost, option.finish, option.kind != "as_requested")
         )
     else:
         winner = delay or min(options, key=lambda item: item.finish, default=None)

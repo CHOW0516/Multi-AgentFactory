@@ -9,7 +9,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.floor import LayoutOut
 
@@ -147,6 +147,15 @@ class MachineOut(ApiModel):
     status: MachineStatus
     floor_x: int
     floor_y: int
+    running_kw: Decimal | None = None
+    idle_kw: Decimal | None = None
+
+
+class MachineEnergyPatch(BaseModel):
+    """Power use in kW; null clears it (no energy tracking for the machine)."""
+
+    running_kw: Decimal | None = Field(default=None, ge=0, le=100000)
+    idle_kw: Decimal | None = Field(default=None, ge=0, le=100000)
 
 
 class MachineIn(BaseModel):
@@ -278,12 +287,14 @@ class DeliveryConfidence(ApiModel):
 
 class PlanOptionOut(ApiModel):
     id: uuid.UUID
-    option_type: Literal["as_requested", "delay", "split", "overtime", "move_other_order"]
+    option_type: Literal["as_requested", "delay", "split", "overtime", "move_other_order", "cheaper_energy"]
     finish_date: date
     split_quantity_first: Decimal | None
     split_finish_date_first: date | None
     overtime_hours: Decimal
     extra_cost: Decimal
+    energy_kwh: Decimal | None = None
+    energy_cost: Decimal | None = None
     margin: Decimal | None
     machine_load: dict[str, float] | None
     impacted_orders: list[ImpactedOrder]
