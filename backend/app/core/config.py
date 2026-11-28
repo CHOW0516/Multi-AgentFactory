@@ -93,6 +93,10 @@ class Settings(BaseSettings):
     energy_offpeak_rate: float = 0.30  # demo value per kWh
     energy_heavy_machine_kw: float = 15  # machines at or above this are kept out of peak when it saves money
     energy_rates_confirmed: float = 0  # set to 1 when an admin saves the Energy settings
+    energy_idle_alert_minutes: float = 30  # idle but switched on for this long = waste alert
+    energy_warmup_minutes: float = 30  # no idle alert when the next job starts within this time
+    energy_abnormal_percent: float = 25  # running power this much above normal = possible fault
+    energy_abnormal_minutes: float = 15  # ...for at least this long
 
     # Simulator
     sim_send_pos: bool = True  # false: the simulator only runs the machines
@@ -103,6 +107,10 @@ class Settings(BaseSettings):
     sim_machine_event_interval_seconds: int = 20
     sim_breakdown_chance_per_hour: float = 0.05
     sim_random_seed: int = 42
+    sim_energy: bool = True  # false: the simulator sends no power readings
+    sim_power_interval_seconds: int = 300  # a power reading per machine at least this often
+    # Chance per machine per hour of a waste problem to show the alerts: left on, or high draw.
+    sim_energy_problem_chance_per_hour: float = 0.03
 
     # Backups
     backup_path: str = "/backups"
@@ -155,6 +163,10 @@ EDITABLE_SETTING_KEYS = [
     "energy_offpeak_rate",
     "energy_heavy_machine_kw",
     "energy_rates_confirmed",
+    "energy_idle_alert_minutes",
+    "energy_warmup_minutes",
+    "energy_abnormal_percent",
+    "energy_abnormal_minutes",
 ]
 
 # Allowed ranges for settings that have more limits than "not negative".
@@ -165,6 +177,10 @@ SETTING_LIMITS = {
     "energy_peak_weekends": (0, 1),
     "energy_peak_holidays": (0, 1),
     "energy_rates_confirmed": (0, 1),
+    "energy_idle_alert_minutes": (1, 1440),
+    "energy_warmup_minutes": (0, 1440),
+    "energy_abnormal_percent": (1, 500),
+    "energy_abnormal_minutes": (1, 1440),
 }
 
 

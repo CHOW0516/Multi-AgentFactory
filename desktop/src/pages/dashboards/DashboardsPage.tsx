@@ -22,6 +22,11 @@ export const CHARTS: ChartDefinition[] = [
   { name: "failed_workflows", title: "Failed workflows and dead letters", kind: "bar", unit: "" },
 ];
 
+export const ENERGY_CHARTS: ChartDefinition[] = [
+  { name: "energy_daily", title: "Electricity per day", kind: "bar", unit: "kWh" },
+  { name: "energy_cost_daily", title: "Electricity cost per day", kind: "bar", unit: "" },
+];
+
 const PRESETS = [{ days: 7, label: "7 days" }, { days: 30, label: "30 days" }, { days: 90, label: "90 days" }];
 const PRIMARY_KPIS = ["on_time_rate", "pending_approvals", "utilisation_today", "open_shortages"];
 
@@ -75,6 +80,11 @@ export function DashboardsPage() {
             <header className="dashboard-section-heading"><span className="section-symbol"><Icon name="factory" size={18} /></span>
               <div><h2 id="production-health">Production & delivery</h2><p>Delivery reliability, approval speed and machine capacity.</p></div></header>
             <div className="grid-charts dashboard-primary">{CHARTS.slice(0, 3).map((definition) => <ChartCard key={definition.name} definition={definition} range={range} />)}</div>
+          </section>
+          <section className="dashboard-section" aria-labelledby="energy-heading">
+            <header className="dashboard-section-heading"><span className="section-symbol"><Icon name="dashboards" size={18} /></span>
+              <div><h2 id="energy-heading">Energy</h2><p>Electricity in peak and off-peak hours, and power used while no job was running.</p></div></header>
+            <div className="grid-charts">{ENERGY_CHARTS.map((definition) => <ChartCard key={definition.name} definition={definition} range={range} />)}</div>
           </section>
           <section className="dashboard-section dashboard-diagnostics" aria-labelledby="diagnostics-heading">
             <button type="button" className="dashboard-disclosure" aria-expanded={diagnostics} aria-controls="dashboard-diagnostics"

@@ -14,6 +14,6 @@ describe("needs attention", () => {
     expect(await within(panel).findByText("LATHE-02 is down")).toBeTruthy();
     const items = within(panel).getAllByRole("listitem");
     expect(within(items[0]).getByText("Urgent")).toBeTruthy();
-    expect(within(items[0]).getByRole("link", { name: "Open floor" }).getAttribute("href")).toBe("/factory-floor");
+    expect(within(items[0]).getByRole("link", { name: "Open floor" }).getAttribute("href")).toBe("/");
   });
 });

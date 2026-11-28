@@ -18,6 +18,12 @@ const CHARTS: Record<string, ChartOut> = {
     { name: "Actual", points: machines.slice(0, 6).map((machine, index) => [machine.code, [66, 57, 33, 61, 38, 21][index]]) },
   ] },
   llm_cost_daily: { name: "llm_cost_daily", series: [{ name: "Cost", points: days.map((day, index) => [day, Number((2.1 + Math.sin(index) * 0.8 + index * 0.05).toFixed(2))]) }] },
+  energy_daily: { name: "energy_daily", series: [
+    { name: "Peak kWh", points: days.map((day, index) => [day, index % 7 > 4 ? 0 : 310 + (index % 3) * 20]) },
+    { name: "Off-peak kWh", points: days.map((day, index) => [day, 240 + (index % 4) * 15]) },
+    { name: "With no job running", points: days.map((day, index) => [day, 35 + (index % 5) * 6]) },
+  ] },
+  energy_cost_daily: { name: "energy_cost_daily", series: [{ name: "Cost", points: days.map((day, index) => [day, index % 7 > 4 ? 75 : 230 + (index % 3) * 12]) }] },
   failed_workflows: { name: "failed_workflows", series: [{ name: "Failed", points: days.map((day, index) => [day, [0, 1, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 1][index]]) }] },
 };
 
@@ -42,7 +48,7 @@ registerMock("GET", "/dashboard/charts/:chartName", ({ params }) => {
 });
 
 const ATTENTION: AttentionItem[] = [
-  { severity: "high", kind: "machine_down", title: "LATHE-02 is down", detail: "Jobs on this machine are being replanned. Check the replan approvals.", link: "/factory-floor", action: "Open floor" },
+  { severity: "high", kind: "machine_down", title: "LATHE-02 is down", detail: "Jobs on this machine are being replanned. Check the replan approvals.", link: "/", action: "Open floor" },
   { severity: "high", kind: "order_at_risk", title: "SO-2026-0412 may miss its date", detail: "Planned to finish on 04 Dec, but promised on 03 Dec.", link: "/orders", action: "Open order" },
   { severity: "medium", kind: "approval_waiting", title: "Order approval for SO-2026-0415 is waiting", detail: "Waiting 5 h.", link: "/approvals", action: "Decide" },
   { severity: "medium", kind: "material_short", title: "SO-2026-0417 is short of material", detail: "Check the purchase requests for this order.", link: "/materials", action: "Open order" },

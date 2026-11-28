@@ -76,5 +76,11 @@ def calendar(
     return regular, cut(merge(days), regular)
 
 
+def in_shift(moment: datetime, zone: ZoneInfo, shifts: list[Shift], holidays: set[date]) -> bool:
+    """True when a shift is running at this moment. Holidays have no shifts."""
+    regular, _ = calendar(moment, moment + timedelta(seconds=1), zone, shifts, holidays)
+    return bool(regular)
+
+
 def overlaps(first: Window, second: Window) -> bool:
     return first[0] < second[1] and second[0] < first[1]

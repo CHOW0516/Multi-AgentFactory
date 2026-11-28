@@ -75,3 +75,25 @@ describe("energy settings", () => {
     await waitFor(() => expect(machines[0].running_kw).toBe("22"));
   });
 });
+
+describe("energy alerts settings", () => {
+  it("saves the waste alert limits", async () => {
+    logInAs("admin");
+    renderPage(<SettingsPage />);
+    await userEvent.click(await screen.findByRole("tab", { name: "Energy" }));
+    const idle = await screen.findByLabelText(/Idle but switched on for/);
+    await userEvent.clear(idle);
+    await userEvent.type(idle, "45");
+    await userEvent.click(screen.getByRole("button", { name: "Save energy settings" }));
+    await waitFor(() => expect(appSettings.values.energy_idle_alert_minutes).toBe(45));
+  });
+  it("blocks an abnormal limit of 0%", async () => {
+    logInAs("admin");
+    renderPage(<SettingsPage />);
+    await userEvent.click(await screen.findByRole("tab", { name: "Energy" }));
+    const percent = await screen.findByLabelText(/Power above normal by/);
+    await userEvent.clear(percent);
+    await userEvent.type(percent, "0");
+    expect(screen.getByRole("button", { name: "Save energy settings" })).toBeDisabled();
+  });
+});

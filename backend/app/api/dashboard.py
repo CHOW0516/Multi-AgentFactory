@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import distinct_on
 
+from app.agents.monitoring.energy import daily_energy
 from app.api.machine_ops import local_start, utilisation
 from app.core.config import settings
 from app.core.db import get_session
@@ -315,6 +316,32 @@ async def chart(
                 )
             ).all()
             points = [(number, float(cost)) for number, cost in rows]
+    elif name in ("energy_daily", "energy_cost_daily"):
+        if name == "energy_cost_daily" and user.role == "store":
+            raise HTTPException(403, "Cost data is restricted")
+        days = sorted((await daily_energy(session, start, min(end, now))).items())
+        if name == "energy_cost_daily":
+            points = [(day.isoformat(), round(total.cost, 2)) for day, total in days]
+        else:
+            return ChartOut(
+                name=name,
+                series=[
+                    ChartSeries(
+                        name="Peak kWh",
+                        points=[(day.isoformat(), round(total.peak_kwh, 1)) for day, total in days],
+                    ),
+                    ChartSeries(
+                        name="Off-peak kWh",
+                        points=[
+                            (day.isoformat(), round(total.kwh - total.peak_kwh, 1)) for day, total in days
+                        ],
+                    ),
+                    ChartSeries(
+                        name="With no job running",
+                        points=[(day.isoformat(), round(total.no_job_kwh, 1)) for day, total in days],
+                    ),
+                ],
+            )
     elif name in ("pending_approvals", "oldest_waiting", "open_shortages", "open_purchase_requests"):
         points = [
             (local_date(now).isoformat(), value)

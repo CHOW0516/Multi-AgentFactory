@@ -151,7 +151,7 @@ class OrderRevised(Contract):
 
 class MachineRaw(Contract):
     machine_id: uuid.UUID
-    kind: Literal["status", "count"]
+    kind: Literal["status", "count", "power"]  # power: kW as a decimal string
     value: str
     at: datetime
 

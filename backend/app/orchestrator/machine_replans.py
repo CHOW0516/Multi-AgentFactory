@@ -44,7 +44,7 @@ async def enqueue(message):
                 "machine_unavailable",
                 f"{machine.code} is unavailable",
                 data.reason,
-                "/factory-floor",
+                "/",
             )
 
 
@@ -142,7 +142,7 @@ async def advance(now=None):
                     "workflow_failed",
                     "Machine replan failed",
                     job.after["reason"],
-                    "/factory-floor",
+                    "/",
                 )
                 continue
             data = job.after

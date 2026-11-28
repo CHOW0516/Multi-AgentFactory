@@ -1,5 +1,6 @@
 """Machine event ingestion and production progress calculations."""
 
+import math
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Protocol
@@ -172,6 +173,10 @@ async def handle(message):
                                 note="Machine reported down",
                             )
                         )
+        elif raw.kind == "power":
+            kilowatts = float(raw.value)
+            if not math.isfinite(kilowatts) or kilowatts < 0:
+                raise ValueError("Power readings must be 0 kW or more")
         elif int(raw.value) < 0:
             raise ValueError("Production counts cannot be negative")
         if raw.kind == "count":

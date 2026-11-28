@@ -96,6 +96,7 @@ def _events_for(fake_broker, machine):
 
 
 async def test_machine_tick_publishes_running_count_and_idle(db_session, fake_broker, monkeypatch):
+    monkeypatch.setattr(settings, "sim_energy", False)  # power readings are tested in test_energy_alerts
     monkeypatch.setattr(settings, "sim_breakdown_chance_per_hour", 0.0)
     now = datetime.now(UTC)
     machine = await _seeded_machine_with_slot(db_session, now)
@@ -122,6 +123,7 @@ async def test_machine_tick_publishes_running_count_and_idle(db_session, fake_br
 
 
 async def test_no_final_count_when_slot_stops_early(db_session, fake_broker, monkeypatch):
+    monkeypatch.setattr(settings, "sim_energy", False)  # power readings are tested in test_energy_alerts
     from sqlalchemy import update
 
     from app.models import ScheduleSlot
@@ -141,6 +143,7 @@ async def test_no_final_count_when_slot_stops_early(db_session, fake_broker, mon
 
 
 async def test_breakdown_then_recovery(db_session, fake_broker, monkeypatch):
+    monkeypatch.setattr(settings, "sim_energy", False)  # power readings are tested in test_energy_alerts
     now = datetime.now(UTC)
     machine = await _seeded_machine_with_slot(db_session, now, hours_left=3)
     simulation = runtime.MachineSimulation(random.Random(7))

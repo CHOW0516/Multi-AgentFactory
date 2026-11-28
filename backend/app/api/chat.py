@@ -2,7 +2,7 @@ import asyncio
 import json
 import uuid
 from collections import OrderedDict, deque
-from datetime import datetime
+from datetime import UTC, datetime, time, timedelta
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -11,9 +11,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from sqlalchemy import func, select
 
+from app.agents.monitoring.energy import daily_energy, energy_alerts, tariff_for
 from app.api.agents import timeline
 from app.api.dashboard import kpi_tiles
 from app.api.machine_ops import overview
+from app.core.config import settings
 from app.core.db import session_scope
 from app.core.security import create_access_token, current_user
 from app.llm.client import DailyCostLimitReached, LlmRefused, LlmUnavailable, call_ai
@@ -57,6 +59,12 @@ SPECS = {
         [],
     ),
     "get_kpis": ("Read factory dashboard KPIs.", {}, []),
+    "energy_summary": (
+        "Read electricity use per day (kWh, peak kWh, cost, kWh with no job running), the tariff, "
+        "and current power alerts. Use it for questions about energy, electricity or power waste.",
+        {"days": {"type": "integer", "minimum": 1, "maximum": 31}},
+        [],
+    ),
 }
 TOOLS = [
     {
@@ -103,6 +111,8 @@ async def read_tool(name, arguments, order_id, user, app):
         async with session_scope() as session:
             if name == "get_kpis":
                 return await kpi_tiles(session, user)
+            if name == "energy_summary":
+                return await energy_summary(session, user, int(arguments.get("days", 7)))
             if name == "list_machines":
                 machines = await session.scalars(select(Machine).order_by(Machine.code))
                 return [
@@ -174,6 +184,42 @@ async def read_tool(name, arguments, order_id, user, app):
             }
     except (ValidationError, ValueError, HTTPException, KeyError, TypeError):
         return {"error": "The read request could not be completed with those arguments"}
+
+
+async def energy_summary(session, user, days: int) -> dict:
+    if not 1 <= days <= 31:
+        return {"error": "days must be 1 to 31"}
+    now = datetime.now(UTC)
+    tariff = await tariff_for(session)
+    start = datetime.combine(
+        now.astimezone(tariff.zone).date() - timedelta(days=days - 1), time.min, tariff.zone
+    )
+    totals = await daily_energy(session, start.astimezone(UTC), now)
+    hide_cost = user.role == "store"
+    rows = [
+        {
+            "day": day,
+            "kwh": round(total.kwh, 1),
+            "peak_kwh": round(total.peak_kwh, 1),
+            "no_job_kwh": round(total.no_job_kwh, 1),
+            **({} if hide_cost else {"cost": round(total.cost, 2)}),
+        }
+        for day, total in sorted(totals.items())
+    ]
+    tariff_info = {
+        "energy_on": tariff.enabled,
+        "peak": f"{tariff.peak_start_minute // 60:02d}:{tariff.peak_start_minute % 60:02d}"
+        f"-{tariff.peak_end_minute // 60:02d}:{tariff.peak_end_minute % 60:02d}",
+        "peak_on_weekends": tariff.peak_weekends,
+    }
+    if not hide_cost:
+        tariff_info |= {"peak_rate": float(tariff.peak_rate), "offpeak_rate": float(tariff.offpeak_rate)}
+    alerts = [
+        {"title": alert["title"], "detail": alert["detail"]} for alert in await energy_alerts(session, now)
+    ]
+    if hide_cost:
+        alerts = [{"title": alert["title"]} for alert in alerts]
+    return {"days": rows, "tariff": tariff_info, "alerts_now": alerts, "currency": settings.currency}
 
 
 async def respond(body, user, app):
