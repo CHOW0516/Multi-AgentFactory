@@ -166,8 +166,8 @@ button.gantt-bar { cursor: pointer; }
 .mismatch { color: var(--color-danger); font-weight: 500; }
 
 /* charts: series colours validated for CVD separation on both surfaces (dataviz validator) */
-:root { --chart-series-1: #2f5bd3; --chart-series-2: #f47230; --chart-grid: var(--color-border); }
-:root[data-theme="dark"] { --chart-series-1: #338ced; --chart-series-2: #e76624; }
+:root { --chart-series-1: #2f5bd3; --chart-series-2: #f47230; --chart-series-3: #7a8699; --chart-grid: var(--color-border); }
+:root[data-theme="dark"] { --chart-series-1: #338ced; --chart-series-2: #e76624; --chart-series-3: #9aa6b8; }
 .chart-card { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .chart-card header { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
 .chart-card h2 { margin: 0; font-size: 15px; font-weight: 600; }

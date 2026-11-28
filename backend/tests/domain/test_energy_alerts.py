@@ -323,3 +323,39 @@ async def test_sim_energy_off_sends_no_power(db_session, fake_broker, monkeypatc
     await db_session.commit()
     await runtime.MachineSimulation(random.Random(3)).tick(NOW, 20)
     assert power_events(fake_broker, machine) == []
+
+
+# ---------------------------------------------------------------- review fixes
+async def test_zero_running_kw_does_not_break_needs_attention(db_session):
+    machine = await add_machine(db_session, status="running", running_kw=0)
+    db_session.add_all(power(machine, ago, 30) for ago in range(20, -1, -5))
+    await db_session.commit()
+    assert await attention_items(db_session, NOW) == []
+
+
+async def test_meter_gaps_restart_the_alert_duration(db_session):
+    running = await add_machine(db_session, status="running")
+    db_session.add_all([power(running, 29, 30), power(running, 1, 30)])  # 28 min unobserved
+    idle = await add_machine(db_session)
+    db_session.add(status(idle, 90, "idle"))
+    db_session.add_all([power(idle, 60, 2), power(idle, 1, 2)])
+    await db_session.commit()
+    assert await energy_alerts(db_session, NOW) == []
+
+
+async def test_alert_links_open_the_factory_floor(db_session):
+    await idle_and_on(db_session)
+    (alert,) = await energy_alerts(db_session, NOW)
+    assert alert["link"] == "/"
+
+
+async def test_daily_energy_splits_a_reading_at_midnight(db_session):
+    machine = await add_machine(db_session, status="running")
+    before_midnight = datetime.combine(NOW.date(), time(23, 55), tzinfo=UTC)
+    db_session.add(
+        MachineEvent(machine_id=machine.id, event_type="power", value="12", happened_at=before_midnight)
+    )
+    await db_session.commit()
+    totals = await daily_energy(db_session, before_midnight, before_midnight + timedelta(minutes=15))
+    assert round(totals[NOW.date()].kwh, 3) == 1
+    assert round(totals[NOW.date() + timedelta(days=1)].kwh, 3) == 2

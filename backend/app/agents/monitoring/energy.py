@@ -7,7 +7,7 @@ raises an alert.
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -87,16 +87,32 @@ async def daily_energy(session, start: datetime, end: datetime) -> dict[date, Da
     days: dict[date, DayEnergy] = defaultdict(DayEnergy)
     peak_rate, offpeak_rate = float(tariff.peak_rate), float(tariff.offpeak_rate)
     for rows in (await readings(session, machines, start, end)).values():
-        for left, right, reading in spans(rows, start, end):
-            hours = (right - left).total_seconds() / 3600
-            peak_hours = tariff.peak_seconds(left, right) / 3600
-            day = days[left.astimezone(tariff.zone).date()]
-            day.kwh += reading.kilowatts * hours
-            day.peak_kwh += reading.kilowatts * peak_hours
-            day.cost += reading.kilowatts * (peak_hours * peak_rate + (hours - peak_hours) * offpeak_rate)
-            if reading.order_id is None:
-                day.no_job_kwh += reading.kilowatts * hours
+        for span_left, span_right, reading in spans(rows, start, end):
+            for left, right in split_at_midnight(span_left, span_right, tariff.zone):
+                add_span(days, left, right, reading, tariff, peak_rate, offpeak_rate)
     return dict(days)
+
+
+def split_at_midnight(left: datetime, right: datetime, zone) -> list[tuple[datetime, datetime]]:
+    """A span that crosses local midnight is cut in two, so each part counts on its own day."""
+    pieces = []
+    while left < right:
+        next_midnight = datetime.combine(left.astimezone(zone).date() + timedelta(days=1), time.min, zone)
+        piece_end = min(right, next_midnight.astimezone(left.tzinfo))
+        pieces.append((left, piece_end))
+        left = piece_end
+    return pieces
+
+
+def add_span(days, left, right, reading, tariff, peak_rate, offpeak_rate) -> None:
+    hours = (right - left).total_seconds() / 3600
+    peak_hours = tariff.peak_seconds(left, right) / 3600
+    day = days[left.astimezone(tariff.zone).date()]
+    day.kwh += reading.kilowatts * hours
+    day.peak_kwh += reading.kilowatts * peak_hours
+    day.cost += reading.kilowatts * (peak_hours * peak_rate + (hours - peak_hours) * offpeak_rate)
+    if reading.order_id is None:
+        day.no_job_kwh += reading.kilowatts * hours
 
 
 async def normal_running_kw(session, machine: Machine, now: datetime) -> float:
@@ -114,6 +130,10 @@ async def normal_running_kw(session, machine: Machine, now: datetime) -> float:
         )
     ).one()
     return float(median) if count >= NORMAL_MIN_READINGS else float(machine.running_kw)
+
+
+def continuous(rows: list[Reading]) -> bool:
+    return all(later.at - earlier.at <= READING_HOLD for earlier, later in zip(rows, rows[1:], strict=False))
 
 
 def money(value: float) -> str:
@@ -149,11 +169,16 @@ async def energy_alerts(session, now: datetime) -> list[dict]:
                 items.append(item)
         elif machine.status == "running":
             normal = await normal_running_kw(session, machine, now)
+            if normal <= 0:
+                continue  # no usable normal power (running_kw 0), so "percent above normal" means nothing
             limit = normal * abnormal_factor
             window = [reading for reading in rows if reading.at > now - abnormal_for]
             anchor = [reading for reading in rows if reading.at <= now - abnormal_for][-1:]
-            # The reading in force at the window start must exist and be recent, so the window is covered.
-            covered = anchor and now - abnormal_for - anchor[0].at <= READING_HOLD
+            # The reading in force at the window start must exist, and no gap in the window may be
+            # longer than READING_HOLD, so the whole window was really measured.
+            covered = (
+                anchor and now - abnormal_for - anchor[0].at <= READING_HOLD and continuous(anchor + window)
+            )
             if covered and all(reading.kilowatts > limit for reading in anchor + window):
                 percent = round(100 * (latest.kilowatts / normal - 1))
                 items.append(
@@ -166,7 +191,7 @@ async def energy_alerts(session, now: datetime) -> list[dict]:
                             f"while running; normal is {normal:.1f} kW. This can be an early sign of wear "
                             "or a fault. Ask maintenance to check it."
                         ),
-                        link="/factory-floor",
+                        link="/",
                         action="Open floor",
                     )
                 )
@@ -176,8 +201,8 @@ async def energy_alerts(session, now: datetime) -> list[dict]:
 async def idle_alert(session, machine, rows, now, idle_after, warmup, working, tariff) -> dict | None:
     on_since = rows[-1].at
     for reading in reversed(rows):
-        if reading.kilowatts <= SWITCHED_ON_KW:
-            break
+        if reading.kilowatts <= SWITCHED_ON_KW or on_since - reading.at > READING_HOLD:
+            break  # switched off, or a meter gap: count only the time we really saw it on
         on_since = reading.at
     idle_since = await session.scalar(
         select(func.max(MachineEvent.happened_at)).where(
@@ -219,6 +244,6 @@ async def idle_alert(session, machine, rows, now, idle_after, warmup, working, t
             f"On and idle for {minutes} min, about {used:.1f} kWh ({money(cost)}) so far. "
             f"{upcoming} Switch it off if it is not needed."
         ),
-        link="/factory-floor",
+        link="/",
         action="Open floor",
     )

@@ -10,7 +10,7 @@ import { ErrorState, LoadingSkeleton } from "../../components/QueryState";
 
 export interface ChartDefinition { name: string; title: string; kind: "line" | "bar"; unit: string }
 
-const SERIES_COLORS = ["var(--chart-series-1)", "var(--chart-series-2)"];
+const SERIES_COLORS = ["var(--chart-series-1)", "var(--chart-series-2)", "var(--chart-series-3)"];
 const axisStyle = { fontSize: 11, fill: "var(--color-text-muted)" };
 
 /** [{label, SeriesA: 1, SeriesB: 2}, ...] from the contract's series/points shape. */
