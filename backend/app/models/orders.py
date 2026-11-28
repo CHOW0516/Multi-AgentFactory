@@ -118,12 +118,15 @@ class PlanOption(TableBase):
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
     option_type: Mapped[str] = mapped_column(
         String(30)
-    )  # as_requested | delay | split | overtime | move_other_order
+    )  # as_requested | delay | split | overtime | move_other_order | cheaper_energy
     finish_date: Mapped[date] = mapped_column(Date)
     split_quantity_first: Mapped[Decimal | None] = mapped_column(Quantity)
     split_finish_date_first: Mapped[date | None] = mapped_column(Date)
     overtime_hours: Mapped[Decimal] = mapped_column(Numeric(8, 2), default=0)
     extra_cost: Mapped[Decimal] = mapped_column(Money, default=0)
+    # Electricity for this order's machine time; empty when energy is off or no machine has a kW value.
+    energy_kwh: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    energy_cost: Mapped[Decimal | None] = mapped_column(Money)
     margin: Mapped[Decimal | None] = mapped_column(Money)
     machine_load: Mapped[dict | None] = mapped_column(JSONB)  # {machine_code: percent}
     impacted_orders: Mapped[list] = mapped_column(JSONB, default=list)

@@ -25,6 +25,7 @@ from app.schemas.api import (
     CustomerOut,
     HolidayIn,
     HolidayOut,
+    MachineEnergyPatch,
     MachineIn,
     MachineOut,
     MachinePatch,
@@ -308,6 +309,28 @@ async def update_machine(
     user: User = Depends(require_roles()),
 ):
     raise HTTPException(409, "Edit machine properties and placement in Edit Floor")
+
+
+@router.patch("/machines/{machine_id}/energy", response_model=MachineOut)
+async def update_machine_energy(
+    machine_id: uuid.UUID,
+    body: MachineEnergyPatch,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(require_roles()),
+):
+    """Running and idle power use in kW. Machine names and placement stay in Edit Floor."""
+    machine = await session.get(Machine, machine_id)
+    if machine is None:
+        raise HTTPException(404, "Machine not found")
+    before = {"running_kw": machine.running_kw, "idle_kw": machine.idle_kw}
+    before = {key: None if value is None else str(value) for key, value in before.items()}
+    machine.running_kw, machine.idle_kw = body.running_kw, body.idle_kw
+    await write_audit(
+        session, user, "update_energy", "machine", machine.id, before, body.model_dump(mode="json")
+    )
+    await session.commit()
+    await session.refresh(machine)
+    return machine
 
 
 # ---- shifts and holidays ----

@@ -368,4 +368,11 @@ def test_plan_explanations_use_fixed_sentences():
     from app.agents.planning.service import OPTION_SENTENCES
 
     assert not hasattr(service, "call_ai")
-    assert set(OPTION_SENTENCES) == {"as_requested", "delay", "split", "overtime", "move_other_order"}
+    assert set(OPTION_SENTENCES) == {
+        "as_requested",
+        "delay",
+        "split",
+        "overtime",
+        "move_other_order",
+        "cheaper_energy",
+    }

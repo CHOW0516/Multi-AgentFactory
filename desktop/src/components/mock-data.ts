@@ -312,7 +312,9 @@ export const holidays: HolidayOut[] = [
 export const appSettings: SettingsOut = {
   app_mode: "demo", currency: "MYR", timezone: "Asia/Kuala_Lumpur",
   values: { extraction_confidence_threshold: 0.85, approval_reminder_hours: 4, approval_escalation_hours: 8,
-    hold_expiry_hours: 48, min_margin: 0.15, overtime_cost_per_hour: 90, llm_daily_cost_limit_usd: 20 },
+    hold_expiry_hours: 48, min_margin: 0.15, overtime_cost_per_hour: 90, llm_daily_cost_limit_usd: 20,
+    energy_enabled: 1, energy_peak_start_minute: 840, energy_peak_end_minute: 1320, energy_peak_weekends: 0, energy_peak_holidays: 0,
+    energy_peak_rate: 0.5, energy_offpeak_rate: 0.3, energy_heavy_machine_kw: 15, energy_rates_confirmed: 0 },
 };
 
 export const machineById = (machineId: string) => machines.find((machine) => machine.id === machineId);

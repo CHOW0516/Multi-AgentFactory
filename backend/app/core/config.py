@@ -83,6 +83,17 @@ class Settings(BaseSettings):
     # 50 = the date half the delivery-confidence replays make, 90 = the date 9 in 10 make.
     promise_confidence_percent: float = 0
 
+    # Energy (each factory sets its own values in Settings, Energy; these are demo defaults)
+    energy_enabled: float = 1  # 1 = on, 0 = off
+    energy_peak_start_minute: float = 14 * 60  # minutes from midnight, factory time zone
+    energy_peak_end_minute: float = 22 * 60  # earlier than start = peak crosses midnight; same = no peak
+    energy_peak_weekends: float = 0  # 1 = Saturday and Sunday are peak days too
+    energy_peak_holidays: float = 0  # 1 = public holidays are peak days too
+    energy_peak_rate: float = 0.50  # demo value per kWh; replace with the rate on your bill
+    energy_offpeak_rate: float = 0.30  # demo value per kWh
+    energy_heavy_machine_kw: float = 15  # machines at or above this are kept out of peak when it saves money
+    energy_rates_confirmed: float = 0  # set to 1 when an admin saves the Energy settings
+
     # Simulator
     sim_send_pos: bool = True  # false: the simulator only runs the machines
     sim_po_interval_seconds: int = 3600
@@ -135,7 +146,26 @@ EDITABLE_SETTING_KEYS = [
     "breakdown_min_minutes",
     "promise_confidence_percent",
     "llm_daily_cost_limit_usd",
+    "energy_enabled",
+    "energy_peak_start_minute",
+    "energy_peak_end_minute",
+    "energy_peak_weekends",
+    "energy_peak_holidays",
+    "energy_peak_rate",
+    "energy_offpeak_rate",
+    "energy_heavy_machine_kw",
+    "energy_rates_confirmed",
 ]
+
+# Allowed ranges for settings that have more limits than "not negative".
+SETTING_LIMITS = {
+    "energy_enabled": (0, 1),
+    "energy_peak_start_minute": (0, 1439),
+    "energy_peak_end_minute": (0, 1439),
+    "energy_peak_weekends": (0, 1),
+    "energy_peak_holidays": (0, 1),
+    "energy_rates_confirmed": (0, 1),
+}
 
 
 @lru_cache

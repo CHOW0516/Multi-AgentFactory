@@ -23,6 +23,14 @@ registerMock("GET", "/parts", () => parts);
 registerMock("GET", "/machines", () => machines);
 registerMock("POST", "/machines", () => { throw new ApiError(409, "Add and place machines in Edit Floor"); });
 registerMock("PATCH", "/machines/:machineId", () => { throw new ApiError(409, "Edit machine properties and placement in Edit Floor"); });
+registerMock("PATCH", "/machines/:machineId/energy", ({ params, body }) => {
+  const machine = machines.find((item) => item.id === params.machineId);
+  if (!machine) throw new ApiError(404, "Machine not found");
+  const change = body as { running_kw: number | null; idle_kw: number | null };
+  machine.running_kw = change.running_kw === null ? null : String(change.running_kw);
+  machine.idle_kw = change.idle_kw === null ? null : String(change.idle_kw);
+  return machine;
+});
 registerMock("GET", "/shifts", () => shifts);
 registerMock("POST", "/shifts", ({ body }) => {
   const shift: ShiftOut = { id: `0c000000-0000-4000-8000-${String(shifts.length + 1).padStart(12, "0")}`, ...(body as Omit<ShiftOut, "id">) };

@@ -52,6 +52,16 @@ MACHINES = [
     ("PACK-01", "Packing Table", "packing", 850, 600),
 ]
 
+# Typical power use in kW by machine type (running, idle but switched on). Demo values only.
+MACHINE_POWER_KW = {
+    "cnc_lathe": (15, 2),
+    "cnc_mill": (18, 2.5),
+    "laser_cutter": (30, 5),
+    "press_brake": (20, 3),
+    "qc_station": (1, 0.3),
+    "packing": (0.5, 0.1),
+}
+
 ROLE_USERS = [
     ("Aisha Manager", "manager@factory.local", "manager"),
     ("Daniel Backup Manager", "manager2@factory.local", "manager"),
@@ -197,7 +207,9 @@ async def seed(reset: bool = False) -> dict[str, int]:
         # ---- machines and calendar ----
         machines = [
             Machine(code=code, name=name, machine_type=machine_type, status="idle", floor_x=x, floor_y=y,
-                    original_floor_x=x, original_floor_y=y)
+                    original_floor_x=x, original_floor_y=y,
+                    running_kw=Decimal(str(MACHINE_POWER_KW[machine_type][0])),
+                    idle_kw=Decimal(str(MACHINE_POWER_KW[machine_type][1])))
             for code, name, machine_type, x, y in MACHINES
         ]
         session.add_all(machines)

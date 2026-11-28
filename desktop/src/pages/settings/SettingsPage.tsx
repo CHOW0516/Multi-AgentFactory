@@ -14,7 +14,7 @@ import { MachineStatusBadge } from "../../components/StatusBadge";
 import { Link } from "react-router-dom";
 import { Icon } from "../../shell/icons";
 
-type Tab = "users" | "machines" | "calendar" | "thresholds" | "demo";
+type Tab = "users" | "machines" | "calendar" | "thresholds" | "energy" | "demo";
 const ROLES: Role[] = ["manager", "sales", "planner", "store", "qc", "admin"];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -29,7 +29,7 @@ function useSave(path: string, method: "POST" | "PATCH", invalidate: string) {
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>("users");
   const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: () => apiFetch<SettingsOut>("/settings") });
-  const tabs: [Tab, string][] = [["users", "Users"], ["machines", "Machines"], ["calendar", "Shifts and holidays"], ["thresholds", "Business rules"]];
+  const tabs: [Tab, string][] = [["users", "Users"], ["machines", "Machines"], ["calendar", "Shifts and holidays"], ["thresholds", "Business rules"], ["energy", "Energy"]];
   if (settingsQuery.data?.app_mode === "demo") tabs.push(["demo", "Demo"]);
 
   return (
@@ -42,6 +42,7 @@ export function SettingsPage() {
       {tab === "machines" ? <MachinesTab /> : null}
       {tab === "calendar" ? <CalendarTab /> : null}
       {tab === "thresholds" ? <QueryState query={settingsQuery}>{(settings) => <ThresholdsTab settings={settings} />}</QueryState> : null}
+      {tab === "energy" ? <QueryState query={settingsQuery}>{(settings) => <EnergyTab settings={settings} />}</QueryState> : null}
       {tab === "demo" ? <DemoTab /> : null}
     </div>
   );
@@ -120,17 +121,40 @@ function MachinesTab() {
     { key: "name", header: "Name", render: (machine) => machine.name },
     { key: "type", header: "Type", render: (machine) => machine.machine_type },
     { key: "status", header: "Status", render: (machine) => <MachineStatusBadge status={machine.status} /> },
+    { key: "power", header: "Power use (kW)", render: (machine) => <MachinePowerForm machine={machine} /> },
   ];
 
   return (
     <div className="stack">
       <div className="page-actions" style={{ justifyContent: "space-between" }}>
-        <p className="small muted">All registered machines, including machines currently off the floor.</p>
+        <p className="small muted">All registered machines, including machines currently off the floor. Leave power use empty for a machine you do not want energy costs for.</p>
         <Link className="button button-primary" to="/?edit=floor"><Icon name="factory" size={16} />Edit floor layout<Icon name="chevron-right" size={16} /></Link>
       </div>
       <DataTable columns={columns} rows={machinesQuery.data} rowKey={(machine) => machine.id} isLoading={machinesQuery.isPending}
         error={machinesQuery.error} onRetry={() => void machinesQuery.refetch()} caption="Machines" />
     </div>
+  );
+}
+
+function MachinePowerForm({ machine }: { machine: MachineOut }) {
+  const [running, setRunning] = useState(machine.running_kw ?? "");
+  const [idle, setIdle] = useState(machine.idle_kw ?? "");
+  const save = useSave(`/machines/${machine.id}/energy`, "PATCH", "machines");
+  const toValue = (text: string) => (text.trim() === "" ? null : Number(text));
+  const invalid = [running, idle].some((text) => text.trim() !== "" && (Number.isNaN(Number(text)) || Number(text) < 0));
+  const changed = running !== (machine.running_kw ?? "") || idle !== (machine.idle_kw ?? "");
+  return (
+    <form className="row small" aria-label={`${machine.code} power use`} onSubmit={(event) => {
+      event.preventDefault();
+      if (!invalid) save.mutate({ running_kw: toValue(running), idle_kw: toValue(idle) });
+    }}>
+      <input style={{ width: 72 }} inputMode="decimal" aria-label={`${machine.code} running kW`} placeholder="Running"
+        value={running} aria-invalid={invalid} onChange={(event) => setRunning(event.target.value)} />
+      <input style={{ width: 72 }} inputMode="decimal" aria-label={`${machine.code} idle kW`} placeholder="Idle"
+        value={idle} aria-invalid={invalid} onChange={(event) => setIdle(event.target.value)} />
+      {changed ? <button type="submit" className="button" disabled={save.isPending || invalid}>Save</button> : null}
+      {save.isError ? <span className="error-text" role="alert">{save.error.message}</span> : null}
+    </form>
   );
 }
 
@@ -187,7 +211,8 @@ function CalendarTab() {
 }
 
 function ThresholdsTab({ settings }: { settings: SettingsOut }) {
-  const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(Object.entries(settings.values).map(([key, value]) => [key, String(value)])));
+  const [values, setValues] = useState<Record<string, string>>(Object.fromEntries(Object.entries(settings.values)
+    .filter(([key]) => !key.startsWith("energy_")).map(([key, value]) => [key, String(value)])));
   const save = useSave("/settings", "PATCH", "settings");
   const invalid = Object.entries(values).filter(([, value]) => value.trim() === "" || Number.isNaN(Number(value)) || Number(value) < 0).map(([key]) => key);
   return (
@@ -207,6 +232,66 @@ function ThresholdsTab({ settings }: { settings: SettingsOut }) {
       {save.isSuccess ? <p className="small" role="status">✓ Saved.</p> : null}
       {save.isError ? <p className="error-text" role="alert">Could not save: {save.error.message}</p> : null}
       <button type="submit" className="button button-primary" disabled={save.isPending || invalid.length > 0}>Save rules</button>
+    </form>
+  );
+}
+
+const toClock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+const toMinutes = (clock: string) => Number(clock.slice(0, 2)) * 60 + Number(clock.slice(3, 5));
+
+function EnergyTab({ settings }: { settings: SettingsOut }) {
+  const values = settings.values;
+  const [draft, setDraft] = useState({
+    enabled: values.energy_enabled !== 0,
+    peakStart: toClock(values.energy_peak_start_minute ?? 840),
+    peakEnd: toClock(values.energy_peak_end_minute ?? 1320),
+    peakWeekends: values.energy_peak_weekends === 1,
+    peakHolidays: values.energy_peak_holidays === 1,
+    peakRate: String(values.energy_peak_rate ?? ""),
+    offpeakRate: String(values.energy_offpeak_rate ?? ""),
+    heavyKw: String(values.energy_heavy_machine_kw ?? ""),
+  });
+  const save = useSave("/settings", "PATCH", "settings");
+  const numbers = [draft.peakRate, draft.offpeakRate, draft.heavyKw];
+  const invalid = numbers.some((text) => text.trim() === "" || Number.isNaN(Number(text)) || Number(text) < 0);
+  const crossesMidnight = draft.peakEnd < draft.peakStart;
+  return (
+    <form className="card compact" style={{ maxWidth: 640 }} aria-label="Energy" onSubmit={(event) => {
+      event.preventDefault();
+      if (invalid) return;
+      save.mutate({ values: {
+        energy_enabled: draft.enabled ? 1 : 0,
+        energy_peak_start_minute: toMinutes(draft.peakStart),
+        energy_peak_end_minute: toMinutes(draft.peakEnd),
+        energy_peak_weekends: draft.peakWeekends ? 1 : 0,
+        energy_peak_holidays: draft.peakHolidays ? 1 : 0,
+        energy_peak_rate: Number(draft.peakRate),
+        energy_offpeak_rate: Number(draft.offpeakRate),
+        energy_heavy_machine_kw: Number(draft.heavyKw),
+        energy_rates_confirmed: 1,
+      } });
+    }}>
+      <p className="small muted">Use the times and rates on your electricity bill. The planner uses them for the electricity cost of each plan, and offers a "Cheaper energy" plan that keeps heavy machines out of peak hours when the due date allows. Times are in {settings.timezone}.</p>
+      {values.energy_rates_confirmed === 0 ? <p className="small" role="note">These are demo values. Replace them with your own and save.</p> : null}
+      <label className="row small"><input type="checkbox" checked={draft.enabled} onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} />Energy features on</label>
+      <div className="grid-2">
+        <div className="field"><label htmlFor="energy-peak-start">Peak starts</label><TimePicker id="energy-peak-start" value={draft.peakStart} required onChange={(peakStart) => setDraft({ ...draft, peakStart })} /></div>
+        <div className="field"><label htmlFor="energy-peak-end">Peak ends</label><TimePicker id="energy-peak-end" value={draft.peakEnd} required onChange={(peakEnd) => setDraft({ ...draft, peakEnd })} /></div>
+      </div>
+      {draft.peakStart === draft.peakEnd ? <p className="small muted">Same start and end means there is no peak time.</p> : null}
+      {crossesMidnight ? <p className="small muted">Peak runs past midnight into the next morning.</p> : null}
+      <label className="row small"><input type="checkbox" checked={draft.peakWeekends} onChange={(event) => setDraft({ ...draft, peakWeekends: event.target.checked })} />Saturday and Sunday have peak hours too</label>
+      <label className="row small"><input type="checkbox" checked={draft.peakHolidays} onChange={(event) => setDraft({ ...draft, peakHolidays: event.target.checked })} />Public holidays have peak hours too</label>
+      <div className="grid-2">
+        <div className="field"><label htmlFor="energy-peak-rate">Peak rate ({settings.currency} per kWh)</label><input id="energy-peak-rate" inputMode="decimal" value={draft.peakRate} onChange={(event) => setDraft({ ...draft, peakRate: event.target.value })} /></div>
+        <div className="field"><label htmlFor="energy-offpeak-rate">Off-peak rate ({settings.currency} per kWh)</label><input id="energy-offpeak-rate" inputMode="decimal" value={draft.offpeakRate} onChange={(event) => setDraft({ ...draft, offpeakRate: event.target.value })} /></div>
+      </div>
+      <div className="field"><label htmlFor="energy-heavy-kw">Heavy machine from (kW)</label><input id="energy-heavy-kw" inputMode="decimal" value={draft.heavyKw} onChange={(event) => setDraft({ ...draft, heavyKw: event.target.value })} /></div>
+      <p className="small muted">Set each machine's power use on the Machines tab.</p>
+      {invalid ? <p className="error-text">Rates and kW must be numbers of 0 or more.</p> : null}
+      {save.isSuccess ? <p className="small" role="status">✓ Saved.</p> : null}
+      {save.isError ? <p className="error-text" role="alert">Could not save: {save.error.message}</p> : null}
+      <button type="submit" className="button button-primary" disabled={save.isPending || invalid}>Save energy settings</button>
     </form>
   );
 }

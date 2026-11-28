@@ -5,6 +5,7 @@ import { Money } from "../../components/Money";
 
 const OPTION_TITLES: Record<PlanOptionOut["option_type"], string> = {
   as_requested: "As requested", delay: "Deliver later", split: "Split delivery", overtime: "Overtime", move_other_order: "Move another order",
+  cheaper_energy: "Cheaper energy",
 };
 
 export function PlanOptionCards({ options, selectedId, onSelect, disabled }: {
@@ -25,6 +26,9 @@ export function PlanOptionCards({ options, selectedId, onSelect, disabled }: {
             {option.split_quantity_first ? <><dt>First part</dt><dd>{formatNumber(option.split_quantity_first)} pcs by {formatDate(option.split_finish_date_first)}</dd></> : null}
             <dt>Overtime</dt><dd>{Number(option.overtime_hours) > 0 ? `${formatNumber(option.overtime_hours, 1)} h` : "None"}</dd>
             <dt>Extra cost</dt><dd>{Number(option.extra_cost) > 0 ? <Money value={option.extra_cost} /> : "None"}</dd>
+            {option.energy_cost != null ? <><dt>Electricity</dt><dd>
+              {formatNumber(option.energy_kwh, 0)} kWh, <Money value={option.energy_cost} />
+            </dd></> : null}
             {option.margin !== null ? <><dt>Margin</dt><dd>{formatNumber(Number(option.margin) * 100, 1)}%</dd></> : null}
             <dt>Other orders</dt>
             <dd>{option.impacted_orders.length === 0 ? "None move" : option.impacted_orders.map((impacted) => (
