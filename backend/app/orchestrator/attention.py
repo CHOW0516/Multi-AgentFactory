@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import distinct_on
 
+from app.agents.monitoring.energy import energy_alerts
 from app.core.config import settings
 from app.core.db import session_scope
 from app.models import CLOSED_ORDER_STATES, AgentMessage, Approval, AuditLog, Machine, Order, ScheduleSlot
@@ -159,6 +160,8 @@ async def attention_items(session, now=None) -> list[dict]:
             )
         )
 
+    items.extend(await energy_alerts(session, now))
+
     items.sort(key=lambda entry: entry["severity"] != "high")
     return items
 
@@ -174,6 +177,8 @@ def briefing_text(items) -> str:
         ("material_short", "order(s) short of material"),
         ("person_needed", "order(s) waiting for a person"),
         ("customer_silent", "customer(s) not answering"),
+        ("energy_idle", "machine(s) switched on with no job"),
+        ("energy_abnormal", "machine(s) using more power than normal"),
     ]
     parts = [f"{counts[kind]} {label}" for kind, label in labels if counts.get(kind)]
     return ", ".join(parts) + "." if parts else "Nothing needs attention. All orders are on track."

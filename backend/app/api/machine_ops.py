@@ -144,7 +144,8 @@ async def overview(machine_id: uuid.UUID, session=Depends(get_session), user=Dep
     events = list(
         await session.scalars(
             select(MachineEvent)
-            .where(MachineEvent.machine_id == machine_id)
+            # Power readings come every few minutes and would push status and count events out.
+            .where(MachineEvent.machine_id == machine_id, MachineEvent.event_type != "power")
             .order_by(MachineEvent.happened_at.desc())
             .limit(25)
         )

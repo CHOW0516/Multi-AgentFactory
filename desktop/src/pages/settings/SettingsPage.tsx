@@ -250,10 +250,16 @@ function EnergyTab({ settings }: { settings: SettingsOut }) {
     peakRate: String(values.energy_peak_rate ?? ""),
     offpeakRate: String(values.energy_offpeak_rate ?? ""),
     heavyKw: String(values.energy_heavy_machine_kw ?? ""),
+    idleMinutes: String(values.energy_idle_alert_minutes ?? ""),
+    warmupMinutes: String(values.energy_warmup_minutes ?? ""),
+    abnormalPercent: String(values.energy_abnormal_percent ?? ""),
+    abnormalMinutes: String(values.energy_abnormal_minutes ?? ""),
   });
   const save = useSave("/settings", "PATCH", "settings");
-  const numbers = [draft.peakRate, draft.offpeakRate, draft.heavyKw];
-  const invalid = numbers.some((text) => text.trim() === "" || Number.isNaN(Number(text)) || Number(text) < 0);
+  const numbers = [draft.peakRate, draft.offpeakRate, draft.heavyKw, draft.warmupMinutes];
+  const atLeastOne = [draft.idleMinutes, draft.abnormalPercent, draft.abnormalMinutes];
+  const bad = (text: string, low: number) => text.trim() === "" || Number.isNaN(Number(text)) || Number(text) < low;
+  const invalid = numbers.some((text) => bad(text, 0)) || atLeastOne.some((text) => bad(text, 1));
   const crossesMidnight = draft.peakEnd < draft.peakStart;
   return (
     <form className="card compact" style={{ maxWidth: 640 }} aria-label="Energy" onSubmit={(event) => {
@@ -268,6 +274,10 @@ function EnergyTab({ settings }: { settings: SettingsOut }) {
         energy_peak_rate: Number(draft.peakRate),
         energy_offpeak_rate: Number(draft.offpeakRate),
         energy_heavy_machine_kw: Number(draft.heavyKw),
+        energy_idle_alert_minutes: Number(draft.idleMinutes),
+        energy_warmup_minutes: Number(draft.warmupMinutes),
+        energy_abnormal_percent: Number(draft.abnormalPercent),
+        energy_abnormal_minutes: Number(draft.abnormalMinutes),
         energy_rates_confirmed: 1,
       } });
     }}>
@@ -288,7 +298,15 @@ function EnergyTab({ settings }: { settings: SettingsOut }) {
       </div>
       <div className="field"><label htmlFor="energy-heavy-kw">Heavy machine from (kW)</label><input id="energy-heavy-kw" inputMode="decimal" value={draft.heavyKw} onChange={(event) => setDraft({ ...draft, heavyKw: event.target.value })} /></div>
       <p className="small muted">Set each machine's power use on the Machines tab.</p>
-      {invalid ? <p className="error-text">Rates and kW must be numbers of 0 or more.</p> : null}
+      <h3 className="section-title">Waste alerts</h3>
+      <p className="small muted">Shown in Needs attention on Dashboards and in the morning briefing.</p>
+      <div className="grid-2">
+        <div className="field"><label htmlFor="energy-idle-minutes">Idle but switched on for (minutes)</label><input id="energy-idle-minutes" inputMode="numeric" value={draft.idleMinutes} onChange={(event) => setDraft({ ...draft, idleMinutes: event.target.value })} /></div>
+        <div className="field"><label htmlFor="energy-warmup-minutes">No alert this long before a job (warm-up, minutes)</label><input id="energy-warmup-minutes" inputMode="numeric" value={draft.warmupMinutes} onChange={(event) => setDraft({ ...draft, warmupMinutes: event.target.value })} /></div>
+        <div className="field"><label htmlFor="energy-abnormal-percent">Power above normal by (%)</label><input id="energy-abnormal-percent" inputMode="numeric" value={draft.abnormalPercent} onChange={(event) => setDraft({ ...draft, abnormalPercent: event.target.value })} /></div>
+        <div className="field"><label htmlFor="energy-abnormal-minutes">...for at least (minutes)</label><input id="energy-abnormal-minutes" inputMode="numeric" value={draft.abnormalMinutes} onChange={(event) => setDraft({ ...draft, abnormalMinutes: event.target.value })} /></div>
+      </div>
+      {invalid ? <p className="error-text">Rates, kW and warm-up must be 0 or more; the other alert values must be 1 or more.</p> : null}
       {save.isSuccess ? <p className="small" role="status">✓ Saved.</p> : null}
       {save.isError ? <p className="error-text" role="alert">Could not save: {save.error.message}</p> : null}
       <button type="submit" className="button button-primary" disabled={save.isPending || invalid}>Save energy settings</button>

@@ -3,6 +3,9 @@
 - Every SIM_PO_INTERVAL_SECONDS: emails a demo PO PDF to IMAP_USER through SMTP (GreenMail in dev).
 - Every SIM_MACHINE_EVENT_INTERVAL_SECONDS: publishes event.machine.raw for machines
   (running + part counts while a locked slot is active, idle otherwise, and random breakdowns).
+- Power readings (kW) for machines with a running_kw value, when the power changes state and at
+  least every SIM_POWER_INTERVAL_SECONDS. Now and then a machine is left on after its shift, or draws
+  too much while running, so the waste alerts have something to find. SIM_ENERGY=false turns this off.
 The simulator never writes business data itself; the agents react to its emails and events.
 """
 
@@ -16,19 +19,24 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from email.message import EmailMessage
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import and_, select
 
 from app.agents.order.intake import DEMO_DATA_FILE
+from app.agents.planning.calendar import in_shift
 from app.core.config import settings
 from app.core.db import session_scope
 from app.messaging import publish_event
-from app.models import Customer, Machine, Part, Quotation, ScheduleSlot
+from app.models import Customer, Holiday, Machine, Part, Quotation, ScheduleSlot, Shift
 from app.simulator.po_documents import DemoPurchaseOrder, demo_extraction, make_purchase_order, render_pdf
 
 logger = logging.getLogger(__name__)
 
 BREAKDOWN_MINUTES = (20, 90)
+LEFT_ON_MINUTES = (60, 180)  # simulated "left on after the shift"
+HIGH_DRAW_MINUTES = (30, 90)  # simulated "draws too much while running"
+HIGH_DRAW_FACTOR = (1.3, 1.45)
 
 
 # ---------------------------------------------------------------- purchase orders
@@ -111,6 +119,10 @@ class MachineSimulation:
     broken_until: dict[uuid.UUID, datetime] = field(default_factory=dict)
     # Slots that got at least one count: slot id -> (machine id, quantity, end time). Used for the final count.
     counted_slots: dict[uuid.UUID, tuple[uuid.UUID, int, datetime]] = field(default_factory=dict)
+    # Power: last state sent ("off", "idle", "running", "high") and when, and active waste problems.
+    last_power: dict[uuid.UUID, tuple[str, datetime]] = field(default_factory=dict)
+    left_on_until: dict[uuid.UUID, datetime] = field(default_factory=dict)
+    high_draw: dict[uuid.UUID, tuple[datetime, float]] = field(default_factory=dict)
 
     async def tick(self, now: datetime | None = None, interval_seconds: float | None = None) -> list[dict]:
         """One simulation step. Returns the events it published."""
@@ -130,12 +142,19 @@ class MachineSimulation:
                     )
                 )
             ).all()
+            shifts = list((await session.scalars(select(Shift))).all()) if settings.sim_energy else []
+            holidays = (
+                set(await session.scalars(select(Holiday.holiday_date))) if settings.sim_energy else set()
+            )
         slot_by_machine = {slot.machine_id: slot for slot in active_slots}
+        working = settings.sim_energy and in_shift(now, ZoneInfo(settings.app_timezone), shifts, holidays)
+        problem_chance = settings.sim_energy_problem_chance_per_hour * interval / 3600
 
         published = await self._publish_final_counts({slot.id for slot in active_slots}, now)
         for machine in machines:
             if machine.id in self.broken_until:
                 if now < self.broken_until[machine.id]:
+                    published.extend(await self._publish_power(machine, "off", now))
                     continue
                 del self.broken_until[machine.id]
                 self.last_status.pop(machine.id, None)  # force a fresh status after repair
@@ -146,6 +165,7 @@ class MachineSimulation:
                 published.append(await self._publish(machine.id, "status", "down", now))
                 self.last_status[machine.id] = "down"
                 logger.info("Simulated breakdown on %s for %s minutes", machine.code, minutes)
+                published.extend(await self._publish_power(machine, "off", now))
                 continue
             status = "running" if slot is not None else "idle"
             if self.last_status.get(machine.id) != status:
@@ -157,7 +177,67 @@ class MachineSimulation:
                     published.append(await self._publish(machine.id, "count", str(count), now))
                     self.last_count[slot.id] = count
                     self.counted_slots[slot.id] = (machine.id, int(slot.quantity), slot.end_at)
+            if settings.sim_energy:
+                state = self._power_state(machine.id, slot is not None, working, now, problem_chance)
+                published.extend(await self._publish_power(machine, state, now))
         return published
+
+    def _power_state(self, machine_id, running: bool, working: bool, now: datetime, chance: float) -> str:
+        """What the machine draws: running (maybe too much), idle (switched on), or off."""
+        if running:
+            high = self.high_draw.get(machine_id)
+            if high and now >= high[0]:
+                del self.high_draw[machine_id]
+                high = None
+            if high is None and self.randomizer.random() < chance:
+                minutes = self.randomizer.randint(*HIGH_DRAW_MINUTES)
+                self.high_draw[machine_id] = (
+                    now + timedelta(minutes=minutes),
+                    self.randomizer.uniform(*HIGH_DRAW_FACTOR),
+                )
+                return "high"
+            return "high" if high else "running"
+        if working:
+            self.left_on_until.pop(machine_id, None)
+            return "idle"
+        if machine_id in self.left_on_until:
+            if now < self.left_on_until[machine_id]:
+                return "idle"
+            del self.left_on_until[machine_id]
+            return "off"
+        left_on_chance = min(1.0, settings.sim_energy_problem_chance_per_hour * 5)  # once per shift end
+        if (
+            self.last_power.get(machine_id, ("off",))[0] == "idle"
+            and self.randomizer.random() < left_on_chance
+        ):
+            # The shift just ended and nobody switched the machine off.
+            self.left_on_until[machine_id] = now + timedelta(
+                minutes=self.randomizer.randint(*LEFT_ON_MINUTES)
+            )
+            return "idle"
+        return "off"
+
+    async def _publish_power(self, machine: Machine, state: str, now: datetime) -> list[dict]:
+        """Send a kW reading when the state changes, and at least every SIM_POWER_INTERVAL_SECONDS."""
+        if not settings.sim_energy or machine.running_kw is None:
+            return []
+        last = self.last_power.get(machine.id)
+        if (
+            last
+            and last[0] == state
+            and (now - last[1]).total_seconds() < settings.sim_power_interval_seconds
+        ):
+            return []
+        running, idle = float(machine.running_kw), float(machine.idle_kw or 0)
+        noise = self.randomizer.uniform(0.95, 1.05)
+        kilowatts = {
+            "off": 0.0,
+            "idle": idle * noise,
+            "running": running * noise,
+            "high": running * self.high_draw.get(machine.id, (now, 1.35))[1] * noise,
+        }[state]
+        self.last_power[machine.id] = (state, now)
+        return [await self._publish(machine.id, "power", f"{kilowatts:.2f}", now)]
 
     async def _publish_final_counts(self, active_slot_ids: set[uuid.UUID], now: datetime) -> list[dict]:
         """When a slot we were counting reaches its end, send its full quantity once.
