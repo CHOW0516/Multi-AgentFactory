@@ -72,26 +72,33 @@ def messages_for(name):
     return or_(AgentMessage.from_agent == name, AgentMessage.to_agent == name)
 
 
-async def stats(session, name, queues, user):
-    job_scope, uses_llm = scope(name)
-    start = local_start(datetime.now(UTC))
-    done, ok, latency, tokens, cost = (
-        await session.execute(
-            select(
-                func.count(),
-                func.count().filter(AgentMessage.status == "ok"),
-                func.avg(AgentMessage.latency_ms),
-                func.coalesce(func.sum(AgentMessage.tokens_in + AgentMessage.tokens_out), 0),
-                func.coalesce(func.sum(AgentMessage.cost_usd), 0),
-            ).where(
-                AgentMessage.from_agent == name,
-                AgentMessage.message_type == "result",
-                AgentMessage.sent_at >= start,
+async def stats(session, names, queues, user):
+    now = datetime.now(UTC)
+    start = local_start(now)
+    results = {
+        row[0]: row[1:]
+        for row in (
+            await session.execute(
+                select(
+                    AgentMessage.from_agent,
+                    func.count(),
+                    func.count().filter(AgentMessage.status == "ok"),
+                    func.avg(AgentMessage.latency_ms),
+                    func.coalesce(func.sum(AgentMessage.tokens_in + AgentMessage.tokens_out), 0),
+                    func.coalesce(func.sum(AgentMessage.cost_usd), 0),
+                )
+                .where(
+                    AgentMessage.from_agent.in_(names),
+                    AgentMessage.message_type == "result",
+                    AgentMessage.sent_at >= start,
+                )
+                .group_by(AgentMessage.from_agent)
             )
-        )
-    ).one()
-    if name == "orchestrator":
-        tokens, cost = (
+        ).all()
+    }
+    orchestrator_usage = None
+    if "orchestrator" in names:
+        orchestrator_usage = (
             await session.execute(
                 select(
                     func.coalesce(func.sum(LlmCall.tokens_in + LlmCall.tokens_out), 0),
@@ -99,48 +106,68 @@ async def stats(session, name, queues, user):
                 ).where(LlmCall.purpose == "orchestrator", LlmCall.created_at >= start)
             )
         ).one()
-    last_seen = await session.scalar(
-        select(func.max(AgentMessage.sent_at)).where(AgentMessage.from_agent == name)
+    last_seen = dict(
+        (
+            await session.execute(
+                select(AgentMessage.from_agent, func.max(AgentMessage.sent_at))
+                .where(AgentMessage.from_agent.in_(names))
+                .group_by(AgentMessage.from_agent)
+            )
+        ).all()
     )
     task = aliased(AgentMessage)
     result = aliased(AgentMessage)
-    pending = await session.scalar(
-        select(func.count())
-        .select_from(task)
-        .where(
-            task.message_type == "task",
-            task.to_agent == name,
-            task.sent_at > datetime.now(UTC) - timedelta(seconds=settings.task_default_timeout_seconds),
-            ~select(result.id).where(result.in_reply_to == task.message_id).exists(),
+    pending = dict(
+        (
+            await session.execute(
+                select(task.to_agent, func.count())
+                .select_from(task)
+                .where(
+                    task.message_type == "task",
+                    task.to_agent.in_(names),
+                    task.sent_at > now - timedelta(seconds=settings.task_default_timeout_seconds),
+                    ~select(result.id).where(result.in_reply_to == task.message_id).exists(),
+                )
+                .group_by(task.to_agent)
+            )
+        ).all()
+    )
+    summaries = []
+    for name in names:
+        job_scope, uses_llm = scope(name)
+        done, ok, latency, tokens, cost = results.get(name, (0, 0, 0, 0, 0))
+        if name == "orchestrator":
+            tokens, cost = orchestrator_usage
+        queue = "orchestrator.results" if name == "orchestrator" else f"agent.{name}"
+        depth, active = queues.get(queue, (0, pending.get(name, 0)))
+        summaries.append(
+            AgentSummary(
+                name=name,
+                job_scope=job_scope,
+                uses_llm=uses_llm,
+                queue_depth=depth,
+                in_progress=active,
+                success_rate_today=100 * ok / done if done else 0,
+                average_latency_ms=float(latency or 0),
+                tokens_today=tokens,
+                cost_today_usd=0 if user.role == "store" else float(cost),
+                dead_letter_count=sum(queues.get(f"{queue}.dlq", (0, 0))),
+                last_seen=last_seen.get(name),
+            )
         )
-    )
-    queue = "orchestrator.results" if name == "orchestrator" else f"agent.{name}"
-    depth, active = queues.get(queue, (0, pending))
-    return AgentSummary(
-        name=name,
-        job_scope=job_scope,
-        uses_llm=uses_llm,
-        queue_depth=depth,
-        in_progress=active,
-        success_rate_today=100 * ok / done if done else 0,
-        average_latency_ms=float(latency or 0),
-        tokens_today=tokens,
-        cost_today_usd=0 if user.role == "store" else float(cost),
-        dead_letter_count=sum(queues.get(f"{queue}.dlq", (0, 0))),
-        last_seen=last_seen,
-    )
+    return summaries
 
 
 @router.get("/agents", response_model=list[AgentSummary])
 async def agents(session=Depends(get_session), user=Depends(current_user)):
     queues = await queue_counts()
-    return [await stats(session, name, queues, user) for name in agent_catalog()]
+    return await stats(session, list(agent_catalog()), queues, user)
 
 
 @router.get("/agents/{name}", response_model=AgentSummary)
 async def agent(name: str, session=Depends(get_session), user=Depends(current_user)):
     scope(name)
-    return await stats(session, name, await queue_counts(), user)
+    return (await stats(session, [name], await queue_counts(), user))[0]
 
 
 def show_message(row, user):

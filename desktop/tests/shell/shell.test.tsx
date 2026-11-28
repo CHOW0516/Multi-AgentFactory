@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { lazy } from "react";
 import { emitMockEvent, queryClient, registerMock, useLiveEvents, apiFetch } from "../../src/api/client";
 import type { LiveEvent, UserOut } from "../../src/api/types";
 import { App } from "../../src/App";
@@ -58,6 +59,23 @@ describe("route discovery and access", () => {
 });
 
 describe("App", () => {
+  it("keeps navigation available while a page loads on demand", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json([])));
+    let finish!: (value: { default: () => React.ReactNode }) => void;
+    const load = vi.fn(() => new Promise<{ default: () => React.ReactNode }>((resolve) => { finish = resolve; }));
+    const DeferredPage = lazy(load);
+    useAuthStore.setState({ token: "t", user: manager, ready: true });
+    renderApp("/", [...routes, { path: "/deferred", label: "Deferred", icon: "orders", roles: [], order: 40, element: <DeferredPage /> }]);
+    expect(load).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("link", { name: "Deferred" }));
+    expect(load).toHaveBeenCalledOnce();
+    expect(screen.getByRole("heading", { name: "Floor page" })).toBeVisible();
+    expect(screen.getByRole("navigation", { name: "Main" })).toBeVisible();
+    await act(async () => finish({ default: () => <h1>Deferred page</h1> }));
+    expect(await screen.findByRole("heading", { name: "Deferred page" })).toBeVisible();
+    expect(screen.queryByLabelText("Loading")).not.toBeInTheDocument();
+  });
+
   it("sends a logged-out user to the fallback login", async () => {
     renderApp("/approvals");
     expect(await screen.findByRole("form", { name: "Log in" })).toBeInTheDocument();

@@ -1,5 +1,6 @@
+import { lazy } from "react";
 import type { PageRoute } from "../../shell/routes";
-import { OrderDetailPage } from "./OrderDetailPage";
+const OrderDetailPage = lazy(() => import("./OrderDetailPage").then((module) => ({ default: module.OrderDetailPage })));
 
 const route: PageRoute = {
   path: "/orders/:orderId", label: "Order", icon: "orders", roles: ["manager", "sales", "planner"], order: 31,

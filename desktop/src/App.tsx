@@ -1,9 +1,10 @@
 // Routes come from src/pages/*/route.tsx (auto-discovered). Do not register pages here.
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuthStore } from "./shell/auth-store";
 import { Layout } from "./shell/Layout";
 import { LoginFallback } from "./shell/LoginFallback";
+import { LoadingSkeleton } from "./components/QueryState";
 import { canOpen, discoverRoutes, type PageRoute } from "./shell/routes";
 
 export function App({ routes = discoverRoutes() }: { routes?: PageRoute[] }) {
@@ -23,16 +24,16 @@ export function App({ routes = discoverRoutes() }: { routes?: PageRoute[] }) {
 
   if (!token || !user) {
     return (
-      <Routes>
+      <Suspense fallback={<LoadingSkeleton />}><Routes>
         <Route path="/login" element={loginElement} />
         <Route path="*" element={<Navigate to="/login" replace state={{ from: location.pathname }} />} />
-      </Routes>
+      </Routes></Suspense>
     );
   }
 
   return (
     <Layout routes={appRoutes}>
-      <Routes>
+      <Suspense fallback={<LoadingSkeleton />}><Routes>
         {appRoutes.map((route) => (
           <Route key={route.path} path={route.path}
             element={canOpen(route, user.role) ? route.element : <p className="empty-state">You do not have access to this page.</p>} />
@@ -40,7 +41,7 @@ export function App({ routes = discoverRoutes() }: { routes?: PageRoute[] }) {
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={firstPage && firstPage.path !== "/" ? <Navigate to={firstPage.path} replace />
           : <p className="empty-state">{appRoutes.length === 0 ? "No pages yet. Pages are added in src/pages/." : "Page not found."}</p>} />
-      </Routes>
+      </Routes></Suspense>
     </Layout>
   );
 }

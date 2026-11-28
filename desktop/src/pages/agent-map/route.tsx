@@ -1,7 +1,8 @@
+import { lazy } from "react";
 import { USE_MOCKS } from "../../api/client";
 import type { PageRoute } from "../../shell/routes";
-import { AgentMap } from "./AgentMap";
 import { installAgentMocks } from "./mocks";
+const AgentMap = lazy(() => import("./AgentMap").then((module) => ({ default: module.AgentMap })));
 
 if (USE_MOCKS) installAgentMocks();
 

@@ -34,7 +34,9 @@ function fromViewCentre(point: Pair, box: DOMRect): Pair {
 export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
   const [view, setView] = useState(initialView);
   const [moving, setMoving] = useState(false);
-  const [turning, setTurning] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
+  const [wheeling, setWheeling] = useState(false);
+  const wheelEnd = useRef<ReturnType<typeof setTimeout>>();
   const latest = useRef(view);
   const destination = useRef<FloorView | null>(null);
   const points = useRef(new Map<number, Pair>());
@@ -47,7 +49,7 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
     cancelAnimationFrame(tween.current);
     tween.current = 0;
     destination.current = null;
-    setTurning(false);
+    setTransitioning(false);
   }
 
   function change(next: FloorView, dragging = false) {
@@ -76,7 +78,7 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
     destination.current = next;
     const from = latest.current;
     const yaw = ((next.azimuth - from.azimuth + 540) % 360) - 180;
-    setTurning(yaw !== 0 || next.elevation !== from.elevation);
+    setTransitioning(true);
     let start: number | undefined;
     function tick(now: number) {
       start ??= now;
@@ -103,6 +105,9 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
     const wheel = (event: WheelEvent) => {
       if (event.deltaY === 0) return;
       event.preventDefault();
+      setWheeling(true);
+      clearTimeout(wheelEnd.current);
+      wheelEnd.current = setTimeout(() => setWheeling(false), 160);
       const anchor = fromViewCentre([event.clientX, event.clientY], element.getBoundingClientRect());
       const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 320 : 1);
       change(zoomAt(latest.current, Math.exp(-Math.max(-300, Math.min(300, delta)) * .0017), anchor), true);
@@ -110,6 +115,7 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
     element.addEventListener("wheel", wheel, { passive: false });
     return () => {
       element.removeEventListener("wheel", wheel);
+      clearTimeout(wheelEnd.current);
       cancelAnimationFrame(frame.current);
       stopTransition();
     };
@@ -187,7 +193,7 @@ export function useFloorCamera(scene: RefObject<SVGSVGElement>) {
   }
 
   return {
-    view, moving, lowDetail: moving || turning, animate, moved,
+    view, moving, lowDetail: moving || transitioning || wheeling, animate, moved,
     reset: () => animate(initialView),
     turn: (amount: number) => animate(orbit(destination.current ?? latest.current, amount)),
     zoom: (amount: number) => animate(zoomAt(destination.current ?? latest.current, amount)),
